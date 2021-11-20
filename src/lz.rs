@@ -53,7 +53,7 @@ impl LzCoder {
         assert!(value >= 1);
         let top_bit = usize::BITS - 1 - value.leading_zeros();
         let mut context_index = context_start;
-        for i in (0..top_bit).rev() {
+        for i in 0..top_bit {
             self.bit(true, context_index);
             self.bit((value >> i) & 1 != 0, context_index + 1);
             context_index += 2;
@@ -78,14 +78,16 @@ pub fn unpack(packed_data: &[u8]) -> Vec<u8> {
         contexts: &mut ContextState,
         mut context_index: usize,
     ) -> usize {
-        let mut length = 1;
+        let mut length = 0;
+        let mut bit_pos = 0;
         while decoder.decode_with_context(&mut contexts.context_mut(context_index)) {
-            length = (length << 1)
-                | decoder.decode_with_context(&mut contexts.context_mut(context_index + 1))
-                    as usize;
+            length |= (decoder.decode_with_context(&mut contexts.context_mut(context_index + 1))
+                as usize)
+                << bit_pos;
+            bit_pos += 1;
             context_index += 2;
         }
-        length
+        length | (1 << bit_pos)
     }
 
     loop {

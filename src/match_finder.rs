@@ -113,7 +113,7 @@ impl<'a> Iterator for Matches<'a> {
                     self.add_to_queue(self.finder.suffixes[self.left_index]);
                     self.move_left();
                 }
-                if self.right_length == self.current_length {
+                if self.right_length == self.current_length && self.matches_left > 0 {
                     self.add_to_queue(self.finder.suffixes[self.right_index]);
                     self.move_right();
                 }
