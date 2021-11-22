@@ -1,10 +1,41 @@
-fn main() {
-    let test_data = include_bytes!("../README.md");
+use std::{fs::File, path::PathBuf};
+use std::io::prelude::*;
+use anyhow::{bail, Result};
 
-    let packed = upkr::pack(test_data);
-    dbg!((test_data.len(), packed.len()));
+fn main() -> Result<()> {
+    let mut args = pico_args::Arguments::from_env();
 
-    let unpacked = upkr::unpack(&packed);
-    dbg!(unpacked.len());
-    assert!(test_data == unpacked.as_slice());
+    match args.subcommand()?.as_ref().map(|s| s.as_str()) {
+        None => print_help(),
+        Some("pack") => {
+            let infile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
+            let outfile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
+
+            let mut data = vec![];
+            File::open(infile)?.read_to_end(&mut data)?;
+            let packed_data = upkr::pack(&data);
+            File::create(outfile)?.write_all(&packed_data)?;
+        }
+        Some("unpack") => {
+            let infile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
+            let outfile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
+
+            let mut data = vec![];
+            File::open(infile)?.read_to_end(&mut data)?;
+            let packed_data = upkr::unpack(&data);
+            File::create(outfile)?.write_all(&packed_data)?;
+        }
+        Some(other) => {
+            bail!("Unknown subcommand '{}'", other);
+        }
+    }
+
+    Ok(())
+}
+
+fn print_help() {
+    eprintln!("Usage:");
+    eprintln!("  upkr pack <infile> <outfile>");
+    eprintln!("  upkr unpack <infile> <outfile>");
+    std::process::exit(1);
 }

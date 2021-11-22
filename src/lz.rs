@@ -1,9 +1,9 @@
 use crate::context_state::ContextState;
-use crate::range_coder::{RangeCoder, RangeDecoder};
+use crate::rans::{RansCoder, RansDecoder};
 
 pub struct LzCoder {
     contexts: ContextState,
-    range_coder: RangeCoder,
+    range_coder: RansCoder,
     last_offset: usize,
 }
 
@@ -11,7 +11,7 @@ impl LzCoder {
     pub fn new() -> LzCoder {
         LzCoder {
             contexts: ContextState::new(1 + 255 + 1 + 64 + 64),
-            range_coder: RangeCoder::new(),
+            range_coder: RansCoder::new(),
             last_offset: 0,
         }
     }
@@ -68,13 +68,13 @@ impl LzCoder {
 }
 
 pub fn unpack(packed_data: &[u8]) -> Vec<u8> {
-    let mut decoder = RangeDecoder::new(packed_data);
+    let mut decoder = RansDecoder::new(packed_data);
     let mut contexts = ContextState::new(1 + 255 + 1 + 64 + 64);
     let mut result = vec![];
     let mut offset = 0;
 
     fn decode_length(
-        decoder: &mut RangeDecoder,
+        decoder: &mut RansDecoder,
         contexts: &mut ContextState,
         mut context_index: usize,
     ) -> usize {

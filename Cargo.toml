@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 cdivsufsort = "2"
+pico-args = "0.4"
+anyhow = "1"
