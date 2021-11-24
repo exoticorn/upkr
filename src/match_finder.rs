@@ -58,7 +58,6 @@ impl MatchFinder {
             right_index: index,
             right_length: usize::MAX,
             current_length: 0,
-            patience_left: 0,
             matches_left: self.max_matches,
             max_length: 0,
             queue: BinaryHeap::new(),
@@ -79,7 +78,6 @@ pub struct Matches<'a> {
     right_index: usize,
     right_length: usize,
     current_length: usize,
-    patience_left: usize,
     matches_left: usize,
     max_length: usize,
     queue: BinaryHeap<usize>,
@@ -103,9 +101,7 @@ impl<'a> Iterator for Matches<'a> {
             {
                 return None;
             }
-            self.patience_left = self.finder.patience;
             while self.matches_left > 0
-                && self.patience_left > 0
                 && (self.left_length == self.current_length
                     || self.right_length == self.current_length)
             {
@@ -129,30 +125,43 @@ impl<'a> Iterator for Matches<'a> {
 
 impl<'a> Matches<'a> {
     fn move_left(&mut self) {
-        if self.left_index > 0 {
+        let mut patience = self.finder.patience;
+        while self.left_length > 0 && patience > 0 && self.left_index > 0 {
             self.left_index -= 1;
             self.left_length = self
                 .left_length
                 .min(self.finder.lcp[self.left_index] as usize);
-        } else {
-            self.left_length = 0;
+            if self
+                .pos_range
+                .contains(&(self.finder.suffixes[self.left_index] as usize))
+            {
+                return;
+            }
+            patience -= 1;
         }
+        self.left_length = 0;
     }
 
     fn move_right(&mut self) {
-        self.right_index += 1;
-        self.right_length = self
-            .right_length
-            .min(self.finder.lcp[self.right_index - 1] as usize);
+        let mut patience = self.finder.patience;
+        while self.right_length > 0 && patience > 0 && self.right_index + 1 < self.finder.suffixes.len() {
+            self.right_index += 1;
+            self.right_length = self
+                .right_length
+                .min(self.finder.lcp[self.right_index - 1] as usize);
+            if self
+                .pos_range
+                .contains(&(self.finder.suffixes[self.right_index] as usize))
+            {
+                return;
+            }
+            patience -= 1;
+        }
+        self.right_length = 0;
     }
 
     fn add_to_queue(&mut self, pos: i32) {
-        if self.pos_range.contains(&(pos as usize)) {
-            self.queue.push(pos as usize);
-            self.matches_left -= 1;
-            self.patience_left = self.finder.patience;
-        } else {
-            self.patience_left = 0;
-        }
+        self.queue.push(pos as usize);
+        self.matches_left -= 1;
     }
 }

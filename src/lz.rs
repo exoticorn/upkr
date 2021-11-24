@@ -1,69 +1,85 @@
 use crate::context_state::ContextState;
-use crate::rans::{RansCoder, RansDecoder};
+use crate::rans::{EntropyCoder, RansDecoder};
 
-pub struct LzCoder {
-    contexts: ContextState,
-    range_coder: RansCoder,
-    last_offset: usize,
+#[derive(Copy, Clone, Debug)]
+pub enum Op {
+    Literal(u8),
+    Match { offset: u32, len: u32 },
 }
 
-impl LzCoder {
-    pub fn new() -> LzCoder {
-        LzCoder {
+impl Op {
+    pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState) {
+        match self {
+            &Op::Literal(lit) => {
+                encode_bit(coder, state, 0, false);
+                let mut context_index = 1;
+                for i in (0..8).rev() {
+                    let bit = (lit >> i) & 1 != 0;
+                    encode_bit(coder, state, context_index, bit);
+                    context_index = (context_index << 1) | bit as usize;
+                }
+            }
+            &Op::Match { offset, len } => {
+                encode_bit(coder, state, 0, true);
+                encode_bit(coder, state, 256, offset != state.last_offset);
+                if offset != state.last_offset {
+                    encode_length(coder, state, 257, offset + 1);
+                    state.last_offset = offset;
+                }
+                encode_length(coder, state, 257 + 64, len);
+            }
+        }
+    }
+}
+
+pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState) {
+    encode_bit(coder, state, 0, true);
+    encode_bit(coder, state, 256, true);
+    encode_length(coder, state, 257, 1);
+}
+
+fn encode_bit(
+    coder: &mut dyn EntropyCoder,
+    state: &mut CoderState,
+    context_index: usize,
+    bit: bool,
+) {
+    coder.encode_with_context(bit, &mut state.contexts.context_mut(context_index));
+}
+
+fn encode_length(
+    coder: &mut dyn EntropyCoder,
+    state: &mut CoderState,
+    context_start: usize,
+    value: u32,
+) {
+    assert!(value >= 1);
+    let top_bit = u32::BITS - 1 - value.leading_zeros();
+    let mut context_index = context_start;
+    for i in 0..top_bit {
+        encode_bit(coder, state, context_index, true);
+        encode_bit(coder, state, context_index + 1, (value >> i) & 1 != 0);
+        context_index += 2;
+    }
+    encode_bit(coder, state, context_index, false);
+}
+
+#[derive(Clone)]
+pub struct CoderState {
+    contexts: ContextState,
+    last_offset: u32,
+}
+
+impl CoderState {
+    pub fn new() -> CoderState {
+        CoderState {
             contexts: ContextState::new(1 + 255 + 1 + 64 + 64),
-            range_coder: RansCoder::new(),
             last_offset: 0,
         }
     }
 
-    pub fn encode_literal(&mut self, byte: u8) {
-        self.bit(false, 0);
-        let mut context_index = 1;
-        for i in (0..8).rev() {
-            let bit = (byte >> i) & 1 != 0;
-            self.bit(bit, context_index);
-            context_index = (context_index << 1) | bit as usize;
-        }
-    }
-
-    pub fn encode_match(&mut self, offset: usize, length: usize) {
-        self.bit(true, 0);
-        if offset != self.last_offset {
-            self.last_offset = offset;
-            self.bit(true, 256);
-            self.length(offset + 1, 257);
-        } else {
-            self.bit(false, 256);
-        }
-        self.length(length, 257 + 64);
-    }
-
-    pub fn finish(mut self) -> Vec<u8> {
-        self.bit(true, 0);
-        self.bit(true, 256);
-        self.length(1, 257);
-        self.range_coder.finish()
-    }
-
-    pub fn last_offset(&self) -> usize {
+    pub fn last_offset(&self) -> u32 {
         self.last_offset
-    }
-
-    fn length(&mut self, value: usize, context_start: usize) {
-        assert!(value >= 1);
-        let top_bit = usize::BITS - 1 - value.leading_zeros();
-        let mut context_index = context_start;
-        for i in 0..top_bit {
-            self.bit(true, context_index);
-            self.bit((value >> i) & 1 != 0, context_index + 1);
-            context_index += 2;
-        }
-        self.bit(false, context_index);
-    }
-
-    fn bit(&mut self, b: bool, context_index: usize) {
-        self.range_coder
-            .encode_with_context(b, &mut self.contexts.context_mut(context_index));
     }
 }
 

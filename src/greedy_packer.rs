@@ -1,9 +1,11 @@
-use crate::lz::LzCoder;
+use crate::lz;
 use crate::match_finder::MatchFinder;
+use crate::rans::RansCoder;
 
 pub fn pack(data: &[u8]) -> Vec<u8> {
     let match_finder = MatchFinder::new(data);
-    let mut lz = LzCoder::new();
+    let mut rans_coder = RansCoder::new();
+    let mut state = lz::CoderState::new();
 
     let mut pos = 0;
     while pos < data.len() {
@@ -12,14 +14,18 @@ pub fn pack(data: &[u8]) -> Vec<u8> {
             let max_offset = 1 << (m.length * 3 - 1).min(31);
             let offset = pos - m.pos;
             if offset < max_offset {
-                lz.encode_match(offset, m.length);
+                lz::Op::Match {
+                    offset: offset as u32,
+                    len: m.length as u32,
+                }
+                .encode(&mut rans_coder, &mut state);
                 pos += m.length;
                 encoded_match = true;
             }
         }
 
         if !encoded_match {
-            let offset = lz.last_offset();
+            let offset = state.last_offset() as usize;
             if offset != 0 {
                 let length = data[pos..]
                     .iter()
@@ -27,7 +33,11 @@ pub fn pack(data: &[u8]) -> Vec<u8> {
                     .take_while(|(a, b)| a == b)
                     .count();
                 if length > 0 {
-                    lz.encode_match(offset, length);
+                    lz::Op::Match {
+                        offset: offset as u32,
+                        len: length as u32,
+                    }
+                    .encode(&mut rans_coder, &mut state);
                     pos += length;
                     encoded_match = true;
                 }
@@ -35,10 +45,11 @@ pub fn pack(data: &[u8]) -> Vec<u8> {
         }
 
         if !encoded_match {
-            lz.encode_literal(data[pos]);
+            lz::Op::Literal(data[pos]).encode(&mut rans_coder, &mut state);
             pos += 1;
         }
     }
 
-    lz.finish()
+    lz::encode_eof(&mut rans_coder, &mut state);
+    rans_coder.finish()
 }

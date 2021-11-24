@@ -4,21 +4,27 @@ const L_BITS: u32 = 16;
 pub const PROB_BITS: u32 = 12;
 pub const ONE_PROB: u32 = 1 << PROB_BITS;
 
+pub trait EntropyCoder {
+    fn encode_bit(&mut self, bit: bool, prob: u16);
+
+    fn encode_with_context(&mut self, bit: bool, context: &mut Context) {
+        self.encode_bit(bit, context.prob());
+        context.update(bit);
+    }
+}
+
 pub struct RansCoder(Vec<u16>);
+
+impl EntropyCoder for RansCoder {
+    fn encode_bit(&mut self, bit: bool, prob: u16) {
+        assert!(prob < 32768);
+        self.0.push(prob | ((bit as u16) << 15));
+    }
+}
 
 impl RansCoder {
     pub fn new() -> RansCoder {
         RansCoder(Vec::new())
-    }
-
-    pub fn encode_with_context(&mut self, bit: bool, context: &mut Context) {
-        self.encode_bit(bit, context.prob());
-        context.update(bit);
-    }
-
-    pub fn encode_bit(&mut self, bit: bool, prob: u16) {
-        assert!(prob < 32768);
-        self.0.push(prob | ((bit as u16) << 15));
     }
 
     pub fn finish(self) -> Vec<u8> {
@@ -48,6 +54,16 @@ impl RansCoder {
 
         buffer.reverse();
         buffer
+    }
+}
+
+pub struct CostCounter(pub f64);
+
+impl EntropyCoder for CostCounter {
+    fn encode_bit(&mut self, bit: bool, prob: u16) {
+        let prob = if bit { prob as u32 } else { ONE_PROB - prob as u32 };
+        let inv_prob = ONE_PROB as f64 / prob as f64;
+        self.0 += inv_prob.log2();
     }
 }
 
