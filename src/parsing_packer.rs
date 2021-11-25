@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::lz;
+use crate::{ProgressCallback, lz};
 use crate::match_finder::MatchFinder;
 use crate::rans::{CostCounter, RansCoder};
 
-pub fn pack(data: &[u8]) -> Vec<u8> {
-    let mut parse = parse(data);
+pub fn pack(data: &[u8], progress_cb: Option<ProgressCallback>) -> Vec<u8> {
+    let mut parse = parse(data, progress_cb);
     let mut ops = vec![];
     while let Some(link) = parse {
         ops.push(link.op);
@@ -34,10 +34,10 @@ struct Arrival {
 
 type Arrivals = HashMap<usize, Vec<Arrival>>;
 
-const MAX_ARRIVALS: usize = 4;
+const MAX_ARRIVALS: usize = 256;
 
-fn parse(data: &[u8]) -> Option<Rc<Parse>> {
-    let match_finder = MatchFinder::new(data);
+fn parse(data: &[u8], mut progress_cb: Option<ProgressCallback>) -> Option<Rc<Parse>> {
+    let mut match_finder = MatchFinder::new(data);
     let mut near_matches = [usize::MAX; 1024];
     let mut last_seen = [usize::MAX; 256];
 
@@ -58,18 +58,19 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
     }
     fn add_match(
         arrivals: &mut Arrivals,
+        cost_counter: &mut CostCounter,
         pos: usize,
         offset: usize,
         length: usize,
         arrival: &Arrival,
     ) {
-        let mut cost_counter = CostCounter(0.);
+        cost_counter.reset();
         let mut state = arrival.state.clone();
         let op = lz::Op::Match {
             offset: offset as u32,
             len: length as u32,
         };
-        op.encode(&mut cost_counter, &mut state);
+        op.encode(cost_counter, &mut state);
         add_arrival(
             arrivals,
             pos + length,
@@ -79,7 +80,7 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
                     op,
                 })),
                 state,
-                cost: arrival.cost + cost_counter.0,
+                cost: arrival.cost + cost_counter.cost(),
             },
         );
     }
@@ -92,6 +93,8 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
             cost: 0.0,
         },
     );
+
+    let cost_counter = &mut CostCounter::new();
     let mut best_per_offset = HashMap::new();
     for pos in 0..data.len() {
         let match_length = |offset: usize| {
@@ -117,8 +120,8 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
             *per_offset = per_offset.min(arrival.cost);
         }
 
-        for arrival in here_arrivals {
-            if arrival.cost > (best_cost + 32.0).min(*best_per_offset.get(&arrival.state.last_offset()).unwrap()) {
+        'arrival_loop: for arrival in here_arrivals {
+            if arrival.cost > (best_cost + 16.0).min(*best_per_offset.get(&arrival.state.last_offset()).unwrap()) {
                 continue;
             }
             let mut found_last_offset = false;
@@ -127,10 +130,13 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
                 closest_match = Some(closest_match.unwrap_or(0).max(m.pos));
                 let offset = pos - m.pos;
                 found_last_offset |= offset as u32 == arrival.state.last_offset();
-                add_match(&mut arrivals, pos, offset, m.length, &arrival);
+                add_match(&mut arrivals, cost_counter, pos, offset, m.length, &arrival);
+                if m.length > 64 {
+                    break 'arrival_loop;
+                }
             }
 
-            let mut near_matches_left = 4;
+            let mut near_matches_left = 8;
             let mut match_pos = last_seen[data[pos] as usize];
             while near_matches_left > 0
                 && match_pos != usize::MAX
@@ -139,7 +145,7 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
                 let offset = pos - match_pos;
                 let length = match_length(offset);
                 assert!(length > 0);
-                add_match(&mut arrivals, pos, offset, length, &arrival);
+                add_match(&mut arrivals, cost_counter, pos, offset, length, &arrival);
                 found_last_offset |= offset as u32 == arrival.state.last_offset();
                 if offset < near_matches.len() {
                     match_pos = near_matches[match_pos % near_matches.len()];
@@ -151,14 +157,14 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
                 let offset = arrival.state.last_offset() as usize;
                 let length = match_length(offset);
                 if length > 0 {
-                    add_match(&mut arrivals, pos, offset, length, &arrival);
+                    add_match(&mut arrivals, cost_counter, pos, offset, length, &arrival);
                 }
             }
 
-            let mut cost_counter = CostCounter(0.);
+            cost_counter.reset();
             let mut state = arrival.state;
             let op = lz::Op::Literal(data[pos]);
-            op.encode(&mut cost_counter, &mut state);
+            op.encode(cost_counter, &mut state);
             add_arrival(
                 &mut arrivals,
                 pos + 1,
@@ -168,12 +174,15 @@ fn parse(data: &[u8]) -> Option<Rc<Parse>> {
                         op,
                     })),
                     state,
-                    cost: arrival.cost + cost_counter.0,
+                    cost: arrival.cost + cost_counter.cost(),
                 },
             );
         }
         near_matches[pos % near_matches.len()] = last_seen[data[pos] as usize];
         last_seen[data[pos] as usize] = pos;
+        if let Some(ref mut cb) = progress_cb {
+            cb(pos + 1);
+        }
     }
     arrivals.remove(&data.len()).unwrap()[0].parse.clone()
 }

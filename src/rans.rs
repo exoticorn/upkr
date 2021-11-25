@@ -57,13 +57,42 @@ impl RansCoder {
     }
 }
 
-pub struct CostCounter(pub f64);
+pub struct CostCounter {
+    cost: f64,
+    log2_table: Vec<f64>,
+}
+
+impl CostCounter {
+    pub fn new() -> CostCounter {
+        let log2_table = (0..ONE_PROB)
+            .map(|prob| {
+                let inv_prob = ONE_PROB as f64 / prob as f64;
+                inv_prob.log2()
+            })
+            .collect();
+        CostCounter {
+            cost: 0.0,
+            log2_table,
+        }
+    }
+
+    pub fn cost(&self) -> f64 {
+        self.cost
+    }
+
+    pub fn reset(&mut self) {
+        self.cost = 0.0;
+    }
+}
 
 impl EntropyCoder for CostCounter {
     fn encode_bit(&mut self, bit: bool, prob: u16) {
-        let prob = if bit { prob as u32 } else { ONE_PROB - prob as u32 };
-        let inv_prob = ONE_PROB as f64 / prob as f64;
-        self.0 += inv_prob.log2();
+        let prob = if bit {
+            prob as u32
+        } else {
+            ONE_PROB - prob as u32
+        };
+        self.cost += self.log2_table[prob as usize];
     }
 }
 

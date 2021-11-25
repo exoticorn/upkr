@@ -8,3 +8,5 @@ mod parsing_packer;
 pub use greedy_packer::pack as pack_fast;
 pub use parsing_packer::pack;
 pub use lz::unpack;
+
+pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);

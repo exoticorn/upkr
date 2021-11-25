@@ -10,6 +10,8 @@ pub struct MatchFinder {
     max_matches_per_length: usize,
     patience: usize,
     max_length_diff: usize,
+
+    queue: BinaryHeap<usize>
 }
 
 impl MatchFinder {
@@ -43,15 +45,17 @@ impl MatchFinder {
             suffixes,
             rev_suffixes,
             lcp,
-            max_queue_size: 100,
-            max_matches_per_length: 5,
-            patience: 100,
-            max_length_diff: 2,
+            max_queue_size: 1000,
+            max_matches_per_length: 10,
+            patience: 1000,
+            max_length_diff: 4,
+            queue: BinaryHeap::new()
         }
     }
 
-    pub fn matches(&self, pos: usize) -> Matches {
+    pub fn matches(&mut self, pos: usize) -> Matches {
         let index = self.rev_suffixes[pos] as usize;
+        self.queue.clear();
         let mut matches = Matches {
             finder: self,
             pos_range: 0..pos,
@@ -62,7 +66,6 @@ impl MatchFinder {
             current_length: usize::MAX,
             matches_left: 0,
             max_length: 0,
-            queue: BinaryHeap::new(),
         };
 
         matches.move_left();
@@ -73,7 +76,7 @@ impl MatchFinder {
 }
 
 pub struct Matches<'a> {
-    finder: &'a MatchFinder,
+    finder: &'a mut MatchFinder,
     pos_range: Range<usize>,
     left_index: usize,
     left_length: usize,
@@ -82,7 +85,6 @@ pub struct Matches<'a> {
     current_length: usize,
     matches_left: usize,
     max_length: usize,
-    queue: BinaryHeap<usize>,
 }
 
 #[derive(Debug)]
@@ -95,8 +97,8 @@ impl<'a> Iterator for Matches<'a> {
     type Item = Match;
 
     fn next(&mut self) -> Option<Match> {
-        if self.queue.is_empty() || self.matches_left == 0 {
-            self.queue.clear();
+        if self.finder.queue.is_empty() || self.matches_left == 0 {
+            self.finder.queue.clear();
             self.current_length = self.current_length.saturating_sub(1).min(self.left_length.max(self.right_length));
             self.max_length = self.max_length.max(self.current_length);
             if self.current_length < 2
@@ -104,16 +106,16 @@ impl<'a> Iterator for Matches<'a> {
             {
                 return None;
             }
-            while self.queue.len() < self.finder.max_queue_size
+            while self.finder.queue.len() < self.finder.max_queue_size
                 && (self.left_length == self.current_length
                     || self.right_length == self.current_length)
             {
                 if self.left_length == self.current_length {
-                    self.add_to_queue(self.finder.suffixes[self.left_index]);
+                    self.finder.queue.push(self.finder.suffixes[self.left_index] as usize);
                     self.move_left();
                 }
                 if self.right_length == self.current_length {
-                    self.add_to_queue(self.finder.suffixes[self.right_index]);
+                    self.finder.queue.push(self.finder.suffixes[self.right_index] as usize);
                     self.move_right();
                 }
             }
@@ -122,7 +124,7 @@ impl<'a> Iterator for Matches<'a> {
 
         self.matches_left = self.matches_left.saturating_sub(1);
 
-        self.queue.pop().map(|pos| Match {
+        self.finder.queue.pop().map(|pos| Match {
             pos,
             length: self.current_length,
         })
@@ -167,9 +169,5 @@ impl<'a> Matches<'a> {
             patience -= 1;
         }
         self.right_length = 0;
-    }
-
-    fn add_to_queue(&mut self, pos: i32) {
-        self.queue.push(pos as usize);
     }
 }

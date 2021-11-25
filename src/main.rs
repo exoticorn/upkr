@@ -18,8 +18,18 @@ fn main() -> Result<()> {
             let packed_data = if fast {
                 upkr::pack_fast(&data)
             } else {
-                upkr::pack(&data)
+                let mut pb = pbr::ProgressBar::new(data.len() as u64);
+                pb.set_units(pbr::Units::Bytes);
+                let packed_data = upkr::pack(
+                    &data,
+                    Some(&mut |pos| {
+                        pb.set(pos as u64);
+                    }),
+                );
+                pb.finish();
+                packed_data
             };
+            println!("Compressed {} bytes to {} bytes ({}%)", data.len(), packed_data.len(), packed_data.len() as f32 * 100. / data.len() as f32);
             File::create(outfile)?.write_all(&packed_data)?;
         }
         Some("unpack") => {

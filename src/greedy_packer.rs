@@ -3,7 +3,7 @@ use crate::match_finder::MatchFinder;
 use crate::rans::RansCoder;
 
 pub fn pack(data: &[u8]) -> Vec<u8> {
-    let match_finder = MatchFinder::new(data);
+    let mut match_finder = MatchFinder::new(data);
     let mut rans_coder = RansCoder::new();
     let mut state = lz::CoderState::new();
 
