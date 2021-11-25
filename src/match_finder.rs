@@ -45,12 +45,32 @@ impl MatchFinder {
             suffixes,
             rev_suffixes,
             lcp,
-            max_queue_size: 1000,
-            max_matches_per_length: 10,
-            patience: 1000,
-            max_length_diff: 4,
+            max_queue_size: 100,
+            max_matches_per_length: 5,
+            patience: 100,
+            max_length_diff: 2,
             queue: BinaryHeap::new()
         }
+    }
+
+    pub fn with_max_queue_size(mut self, v: usize) -> MatchFinder {
+        self.max_queue_size = v;
+        self
+    }
+
+    pub fn with_patience(mut self, v: usize) -> MatchFinder {
+        self.patience = v;
+        self
+    }
+
+    pub fn with_max_matches_per_length(mut self, v: usize) -> MatchFinder {
+        self.max_matches_per_length = v;
+        self
+    }
+
+    pub fn with_max_length_diff(mut self, v: usize) -> MatchFinder {
+        self.max_length_diff = v;
+        self
     }
 
     pub fn matches(&mut self, pos: usize) -> Matches {

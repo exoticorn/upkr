@@ -8,20 +8,21 @@ fn main() -> Result<()> {
     match args.subcommand()?.as_ref().map(|s| s.as_str()) {
         None => print_help(),
         Some("pack") => {
-            let fast = args.contains("--fast");
+            let level = args.opt_value_from_str(["-l", "--level"])?.unwrap_or(2u8);
 
             let infile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
             let outfile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
 
             let mut data = vec![];
             File::open(infile)?.read_to_end(&mut data)?;
-            let packed_data = if fast {
+            let packed_data = if level == 0 {
                 upkr::pack_fast(&data)
             } else {
                 let mut pb = pbr::ProgressBar::new(data.len() as u64);
                 pb.set_units(pbr::Units::Bytes);
                 let packed_data = upkr::pack(
                     &data,
+                    level,
                     Some(&mut |pos| {
                         pb.set(pos as u64);
                     }),
@@ -29,7 +30,12 @@ fn main() -> Result<()> {
                 pb.finish();
                 packed_data
             };
-            println!("Compressed {} bytes to {} bytes ({}%)", data.len(), packed_data.len(), packed_data.len() as f32 * 100. / data.len() as f32);
+            println!(
+                "Compressed {} bytes to {} bytes ({}%)",
+                data.len(),
+                packed_data.len(),
+                packed_data.len() as f32 * 100. / data.len() as f32
+            );
             File::create(outfile)?.write_all(&packed_data)?;
         }
         Some("unpack") => {
