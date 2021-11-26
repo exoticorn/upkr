@@ -1,14 +1,18 @@
 use crate::lz;
 use crate::match_finder::MatchFinder;
 use crate::rans::RansCoder;
+use crate::ProgressCallback;
 
-pub fn pack(data: &[u8]) -> Vec<u8> {
+pub fn pack(data: &[u8], mut progress_callback: Option<ProgressCallback>) -> Vec<u8> {
     let mut match_finder = MatchFinder::new(data);
     let mut rans_coder = RansCoder::new();
     let mut state = lz::CoderState::new();
 
     let mut pos = 0;
     while pos < data.len() {
+        if let Some(ref mut cb) = progress_callback {
+            cb(pos);
+        }
         let mut encoded_match = false;
         if let Some(m) = match_finder.matches(pos).next() {
             let max_offset = 1 << (m.length * 3 - 1).min(31);

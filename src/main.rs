@@ -15,21 +15,18 @@ fn main() -> Result<()> {
 
             let mut data = vec![];
             File::open(infile)?.read_to_end(&mut data)?;
-            let packed_data = if level == 0 {
-                upkr::pack_fast(&data)
-            } else {
-                let mut pb = pbr::ProgressBar::new(data.len() as u64);
-                pb.set_units(pbr::Units::Bytes);
-                let packed_data = upkr::pack(
-                    &data,
-                    level,
-                    Some(&mut |pos| {
-                        pb.set(pos as u64);
-                    }),
-                );
-                pb.finish();
-                packed_data
-            };
+            
+            let mut pb = pbr::ProgressBar::new(data.len() as u64);
+            pb.set_units(pbr::Units::Bytes);
+            let packed_data = upkr::pack(
+                &data,
+                level,
+                Some(&mut |pos| {
+                    pb.set(pos as u64);
+                }),
+            );
+            pb.finish();
+
             println!(
                 "Compressed {} bytes to {} bytes ({}%)",
                 data.len(),
@@ -57,7 +54,7 @@ fn main() -> Result<()> {
 
 fn print_help() {
     eprintln!("Usage:");
-    eprintln!("  upkr pack <infile> <outfile>");
+    eprintln!("  upkr pack [-l level(0-9)] <infile> <outfile>");
     eprintln!("  upkr unpack <infile> <outfile>");
     std::process::exit(1);
 }
