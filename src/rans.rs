@@ -1,7 +1,7 @@
 use crate::context_state::Context;
 
-const L_BITS: u32 = 16;
-pub const PROB_BITS: u32 = 12;
+const L_BITS: u32 = 12;
+pub const PROB_BITS: u32 = 8;
 pub const ONE_PROB: u32 = 1 << PROB_BITS;
 
 pub trait EntropyCoder {
