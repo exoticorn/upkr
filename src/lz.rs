@@ -40,7 +40,9 @@ impl Op {
 
 pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState) {
     encode_bit(coder, state, 0, true);
-    encode_bit(coder, state, 256, true);
+    if !state.prev_was_match {
+        encode_bit(coder, state, 256, true);
+    }
     encode_length(coder, state, 257, 1);
 }
 
