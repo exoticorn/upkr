@@ -6,7 +6,7 @@ const UPDATE_ADD: u32 = 8;
 
 #[derive(Clone)]
 pub struct ContextState {
-    contexts: Vec<u16>,
+    contexts: Vec<u8>,
 }
 
 pub struct Context<'a> {
@@ -17,7 +17,7 @@ pub struct Context<'a> {
 impl ContextState {
     pub fn new(size: usize) -> ContextState {
         ContextState {
-            contexts: vec![INIT_PROB; size],
+            contexts: vec![INIT_PROB as u8; size],
         }
     }
 
@@ -28,15 +28,15 @@ impl ContextState {
 
 impl<'a> Context<'a> {
     pub fn prob(&self) -> u16 {
-        self.state.contexts[self.index]
+        self.state.contexts[self.index] as u16
     }
 
     pub fn update(&mut self, bit: bool) {
         let old = self.state.contexts[self.index];
         self.state.contexts[self.index] = if bit {
-            old + ((ONE_PROB - old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u16
+            old + ((ONE_PROB - old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
         } else {
-            old - ((old + UPDATE_ADD as u16) >> UPDATE_RATE)
+            old - ((old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
         };
     }
 }
