@@ -6,7 +6,7 @@ use crate::match_finder::MatchFinder;
 use crate::rans::{CostCounter, RansCoder};
 use crate::{lz, ProgressCallback};
 
-pub fn pack(data: &[u8], level: u8, progress_cb: Option<ProgressCallback>) -> Vec<u8> {
+pub fn pack(data: &[u8], level: u8, use_bitstream: bool, progress_cb: Option<ProgressCallback>) -> Vec<u8> {
     let mut parse = parse(data, Config::from_level(level), progress_cb);
     let mut ops = vec![];
     while let Some(link) = parse {
@@ -14,7 +14,7 @@ pub fn pack(data: &[u8], level: u8, progress_cb: Option<ProgressCallback>) -> Ve
         parse = link.prev.clone();
     }
     let mut state = lz::CoderState::new();
-    let mut coder = RansCoder::new();
+    let mut coder = RansCoder::new(use_bitstream);
     for op in ops.into_iter().rev() {
         op.encode(&mut coder, &mut state);
     }

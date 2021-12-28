@@ -9,6 +9,7 @@ fn main() -> Result<()> {
         None => print_help(),
         Some("pack") => {
             let level = args.opt_value_from_str(["-l", "--level"])?.unwrap_or(2u8);
+            let use_bitstream = args.contains(["-b", "--bitstream"]);
 
             let infile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
             let outfile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
@@ -21,6 +22,7 @@ fn main() -> Result<()> {
             let packed_data = upkr::pack(
                 &data,
                 level,
+                use_bitstream,
                 Some(&mut |pos| {
                     pb.set(pos as u64);
                 }),
@@ -36,12 +38,14 @@ fn main() -> Result<()> {
             File::create(outfile)?.write_all(&packed_data)?;
         }
         Some("unpack") => {
+            let use_bitstream = args.contains(["-b", "--bitstream"]);
+
             let infile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
             let outfile = args.free_from_os_str::<PathBuf, bool>(|s| Ok(s.into()))?;
 
             let mut data = vec![];
             File::open(infile)?.read_to_end(&mut data)?;
-            let packed_data = upkr::unpack(&data);
+            let packed_data = upkr::unpack(&data, use_bitstream);
             File::create(outfile)?.write_all(&packed_data)?;
         }
         Some(other) => {

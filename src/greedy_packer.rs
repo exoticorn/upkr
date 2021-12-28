@@ -3,9 +3,13 @@ use crate::match_finder::MatchFinder;
 use crate::rans::RansCoder;
 use crate::ProgressCallback;
 
-pub fn pack(data: &[u8], mut progress_callback: Option<ProgressCallback>) -> Vec<u8> {
+pub fn pack(
+    data: &[u8],
+    use_bitstream: bool,
+    mut progress_callback: Option<ProgressCallback>,
+) -> Vec<u8> {
     let mut match_finder = MatchFinder::new(data);
-    let mut rans_coder = RansCoder::new();
+    let mut rans_coder = RansCoder::new(use_bitstream);
     let mut state = lz::CoderState::new();
 
     let mut pos = 0;

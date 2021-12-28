@@ -77,7 +77,7 @@ fn encode_length(
 pub struct CoderState {
     contexts: ContextState,
     last_offset: u32,
-    prev_was_match: bool
+    prev_was_match: bool,
 }
 
 impl CoderState {
@@ -85,7 +85,7 @@ impl CoderState {
         CoderState {
             contexts: ContextState::new(1 + 255 + 1 + 64 + 64),
             last_offset: 0,
-            prev_was_match: false
+            prev_was_match: false,
         }
     }
 
@@ -94,8 +94,8 @@ impl CoderState {
     }
 }
 
-pub fn unpack(packed_data: &[u8]) -> Vec<u8> {
-    let mut decoder = RansDecoder::new(packed_data);
+pub fn unpack(packed_data: &[u8], use_bitstream: bool) -> Vec<u8> {
+    let mut decoder = RansDecoder::new(packed_data, use_bitstream);
     let mut contexts = ContextState::new(1 + 255 + 1 + 64 + 64);
     let mut result = vec![];
     let mut offset = 0;
