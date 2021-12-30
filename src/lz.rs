@@ -9,29 +9,32 @@ pub enum Op {
 
 impl Op {
     pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState) {
+        let base_context = 256 * (state.pos & 3);
         match self {
             &Op::Literal(lit) => {
-                encode_bit(coder, state, 0, false);
+                encode_bit(coder, state, base_context, false);
                 let mut context_index = 1;
                 for i in (0..8).rev() {
                     let bit = (lit >> i) & 1 != 0;
-                    encode_bit(coder, state, context_index, bit);
+                    encode_bit(coder, state, base_context + context_index, bit);
                     context_index = (context_index << 1) | bit as usize;
                 }
+                state.pos += 1;
                 state.prev_was_match = false;
             }
             &Op::Match { offset, len } => {
-                encode_bit(coder, state, 0, true);
+                encode_bit(coder, state, base_context, true);
                 if !state.prev_was_match {
-                    encode_bit(coder, state, 256, offset != state.last_offset);
+                    encode_bit(coder, state, 1024, offset != state.last_offset);
                 } else {
                     assert!(offset != state.last_offset);
                 }
                 if offset != state.last_offset {
-                    encode_length(coder, state, 257, offset + 1);
+                    encode_length(coder, state, 1025, offset + 1);
                     state.last_offset = offset;
                 }
-                encode_length(coder, state, 257 + 64, len);
+                encode_length(coder, state, 1025 + 64, len);
+                state.pos += len as usize;
                 state.prev_was_match = true;
             }
         }
@@ -39,11 +42,11 @@ impl Op {
 }
 
 pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState) {
-    encode_bit(coder, state, 0, true);
+    encode_bit(coder, state, 256 * (state.pos & 3), true);
     if !state.prev_was_match {
-        encode_bit(coder, state, 256, true);
+        encode_bit(coder, state, 1024, true);
     }
-    encode_length(coder, state, 257, 1);
+    encode_length(coder, state, 1025, 1);
 }
 
 fn encode_bit(
@@ -77,14 +80,16 @@ fn encode_length(
 pub struct CoderState {
     contexts: ContextState,
     last_offset: u32,
+    pos: usize,
     prev_was_match: bool,
 }
 
 impl CoderState {
     pub fn new() -> CoderState {
         CoderState {
-            contexts: ContextState::new(1 + 255 + 1 + 64 + 64),
+            contexts: ContextState::new((1 + 255) * 4 + 1 + 64 + 64),
             last_offset: 0,
+            pos: 0,
             prev_was_match: false,
         }
     }
@@ -96,7 +101,7 @@ impl CoderState {
 
 pub fn unpack(packed_data: &[u8], use_bitstream: bool) -> Vec<u8> {
     let mut decoder = RansDecoder::new(packed_data, use_bitstream);
-    let mut contexts = ContextState::new(1 + 255 + 1 + 64 + 64);
+    let mut contexts = ContextState::new((1 + 255) * 4 + 1 + 64 + 64);
     let mut result = vec![];
     let mut offset = 0;
     let mut prev_was_match = false;
@@ -119,14 +124,15 @@ pub fn unpack(packed_data: &[u8], use_bitstream: bool) -> Vec<u8> {
     }
 
     loop {
-        if decoder.decode_with_context(&mut contexts.context_mut(0)) {
-            if prev_was_match || decoder.decode_with_context(&mut contexts.context_mut(256)) {
-                offset = decode_length(&mut decoder, &mut contexts, 257) - 1;
+        let base_context = 256 * (result.len() & 3);
+        if decoder.decode_with_context(&mut contexts.context_mut(base_context)) {
+            if prev_was_match || decoder.decode_with_context(&mut contexts.context_mut(1024)) {
+                offset = decode_length(&mut decoder, &mut contexts, 1025) - 1;
                 if offset == 0 {
                     break;
                 }
             }
-            let length = decode_length(&mut decoder, &mut contexts, 257 + 64);
+            let length = decode_length(&mut decoder, &mut contexts, 1025 + 64);
             for _ in 0..length {
                 result.push(result[result.len() - offset]);
             }
@@ -135,7 +141,7 @@ pub fn unpack(packed_data: &[u8], use_bitstream: bool) -> Vec<u8> {
             let mut context_index = 1;
             let mut byte = 0;
             for i in (0..8).rev() {
-                let bit = decoder.decode_with_context(&mut contexts.context_mut(context_index));
+                let bit = decoder.decode_with_context(&mut contexts.context_mut(base_context + context_index));
                 context_index = (context_index << 1) | bit as usize;
                 byte |= (bit as u8) << i;
             }
