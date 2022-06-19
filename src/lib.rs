@@ -21,3 +21,12 @@ pub fn pack(
         parsing_packer::pack(data, level, use_bitstream, progress_callback)
     }
 }
+
+pub fn compressed_size(mut data: &[u8]) -> f32 {
+    let mut state = 0;
+    while state < 4096 {
+        state = (state << 8) | data[0] as u32;
+        data = &data[1..];
+    }
+    data.len() as f32 + (state as f32).log2() / 8.
+}
