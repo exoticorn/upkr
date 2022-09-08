@@ -34,9 +34,9 @@ int upkr_decode_bit(int context_index) {
     
     if(bit) {
         upkr_state = prob * (upkr_state >> 8) + (upkr_state & 255);
-        upkr_probs[context_index] = prob + ((255 - prob + 8) >> 4);
+        upkr_probs[context_index] = prob + ((256 - prob + 8) >> 4);
     } else {
-        upkr_state = (255 - prob) * (upkr_state >> 8) + (upkr_state & 255) - prob;
+        upkr_state = (256 - prob) * (upkr_state >> 8) + (upkr_state & 255) - prob;
         upkr_probs[context_index] = prob - ((prob + 8) >> 4);
     }
     
@@ -75,20 +75,18 @@ int upkr_unpack(void* destination, void* compressed_data) {
                 }
             }
             int length = upkr_decode_length(257 + 64);
-            while(length-- > 1) {
+            while(length--) {
                 *write_ptr = write_ptr[-offset];
                 ++write_ptr;
             }
             prev_was_match = 1;
         } else {
-            int context_index = 1;
-            int byte = 0;
+            u8 context_index = 1;
             for(int i = 0; i < 8; ++i) {
                 int bit = upkr_decode_bit(context_index);
                 context_index = (context_index << 1) + bit;
-                byte |= bit << i;
             }
-            *write_ptr++ = byte;
+            *write_ptr++ = context_index;
             prev_was_match = 0;
         }
     }
