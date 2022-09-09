@@ -32,14 +32,18 @@ int upkr_decode_bit(int context_index) {
     int prob = upkr_probs[context_index];
     int bit = (upkr_state & 255) < prob ? 1 : 0;
     
-    if(bit) {
-        upkr_state = prob * (upkr_state >> 8) + (upkr_state & 255);
-        upkr_probs[context_index] = prob + ((256 - prob + 8) >> 4);
-    } else {
-        upkr_state = (256 - prob) * (upkr_state >> 8) + (upkr_state & 255) - prob;
-        upkr_probs[context_index] = prob - ((prob + 8) >> 4);
+    int tmp = prob;
+    if(!bit) {
+        tmp = 256 - tmp;
     }
-    
+    upkr_state = tmp * (upkr_state >> 8) + (upkr_state & 255);
+    tmp += (256 - tmp + 8) >> 4;
+    if(!bit) {
+        upkr_state -= prob;
+        tmp = 256 - tmp;
+    }
+    upkr_probs[context_index] = tmp;
+
     return bit;
 }
 

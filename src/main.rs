@@ -16,7 +16,7 @@ fn main() -> Result<()> {
 
             let mut data = vec![];
             File::open(infile)?.read_to_end(&mut data)?;
-            
+
             let mut pb = pbr::ProgressBar::new(data.len() as u64);
             pb.set_units(pbr::Units::Bytes);
             let packed_data = upkr::pack(
@@ -58,7 +58,10 @@ fn main() -> Result<()> {
 
 fn print_help() {
     eprintln!("Usage:");
-    eprintln!("  upkr pack [-l level(0-9)] <infile> <outfile>");
-    eprintln!("  upkr unpack <infile> <outfile>");
+    eprintln!("  upkr pack [-b] [-l level(0-9)] <infile> <outfile>");
+    eprintln!("  upkr unpack [-b] <infile> <outfile>");
+    eprintln!();
+    eprintln!(" -b, --bitstream     bitstream mode");
+    eprintln!(" -l, --level N       compression level 0-9");
     std::process::exit(1);
 }
