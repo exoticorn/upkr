@@ -81,12 +81,12 @@ int upkr_unpack(void* destination, void* compressed_data) {
             }
             prev_was_match = 1;
         } else {
-            u8 context_index = 1;
-            for(int i = 0; i < 8; ++i) {
-                int bit = upkr_decode_bit(context_index);
-                context_index = (context_index << 1) + bit;
+            int byte = 1;
+            while(byte < 256) {
+                int bit = upkr_decode_bit(byte);
+                byte = (byte << 1) + bit;
             }
-            *write_ptr++ = context_index;
+            *write_ptr++ = byte;
             prev_was_match = 0;
         }
     }
