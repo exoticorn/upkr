@@ -1,8 +1,8 @@
 use crate::rans::{ONE_PROB, PROB_BITS};
 
 const INIT_PROB: u16 = 1 << (PROB_BITS - 1);
-const UPDATE_RATE: u32 = 4;
-const UPDATE_ADD: u32 = 8;
+const UPDATE_RATE: i32 = 4;
+const UPDATE_ADD: i32 = 8;
 
 #[derive(Clone)]
 pub struct ContextState {
@@ -33,10 +33,13 @@ impl<'a> Context<'a> {
 
     pub fn update(&mut self, bit: bool) {
         let old = self.state.contexts[self.index];
-        self.state.contexts[self.index] = if !bit {
-            old + ((ONE_PROB - old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
+        let offset = if !bit {
+            ONE_PROB as i32 >> UPDATE_RATE
         } else {
-            old - ((old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
+            0
         };
+
+        self.state.contexts[self.index] =
+            (offset + old as i32 - ((old as i32 + UPDATE_ADD) >> UPDATE_RATE)) as u8;
     }
 }

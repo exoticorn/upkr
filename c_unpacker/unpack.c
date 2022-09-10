@@ -19,8 +19,8 @@ int upkr_decode_bit(int context_index) {
             upkr_current_byte = *upkr_data_ptr++;
             upkr_bits_left = 8;
         }
-        upkr_state = (upkr_state << 1) + (upkr_current_byte & 1);
-        upkr_current_byte >>= 1;
+        upkr_state = (upkr_state << 1) + (upkr_current_byte >> 7);
+        upkr_current_byte <<= 1;
         --upkr_bits_left;
     }
 #else
@@ -30,19 +30,18 @@ int upkr_decode_bit(int context_index) {
 #endif
    
     int prob = upkr_probs[context_index];
-    int bit = (upkr_state & 255) < prob ? 1 : 0;
+    int bit = (upkr_state & 255) >= prob ? 1 : 0;
     
-    int tmp = prob;
-    if(!bit) {
-        tmp = 256 - tmp;
+    int prob_offset = 16;
+    int state_offset = 0;
+    int state_scale = prob;
+    if(bit) {
+        state_offset = -prob;
+        state_scale = 256 - prob;
+        prob_offset = 0;
     }
-    upkr_state = tmp * (upkr_state >> 8) + (upkr_state & 255);
-    tmp += (256 - tmp + 8) >> 4;
-    if(!bit) {
-        upkr_state -= prob;
-        tmp = 256 - tmp;
-    }
-    upkr_probs[context_index] = tmp;
+    upkr_state = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255);
+    upkr_probs[context_index] = prob_offset + prob - ((prob + 8) >> 4); 
 
     return bit;
 }
