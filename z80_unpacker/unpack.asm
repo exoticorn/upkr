@@ -109,12 +109,10 @@ unpack:
         ;                 offset = upkr_decode_length(257) - 1;
         ;                 if (0 == offset) break;
         ;             }
-    ld      a,d                 ; A = prev_was_match
-    or      a
-    jr      nz,.decode_offset   ; if(prev_was_match
-    call    decode_bit          ; upkr_decode_bit(256)
-    jr      nc,.keep_offset
-.decode_offset:
+    xor     a
+    cp      d                   ; CF = prev_was_match
+    call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
+    jr      nc,.keep_offset     ; if neither, keep old offset
     inc     c
     call    decode_length
     dec     de                  ; offset = upkr_decode_length(257) - 1;
