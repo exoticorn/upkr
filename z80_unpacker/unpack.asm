@@ -270,11 +270,11 @@ decode_length:
     ld      de,$7FFF            ; length = 0 with positional-stop-bit
     jr      .loop_entry
 .loop:
-    inc     bc                  ; context_index + 1 ; TODO can be just `inc c` for 257.. and 257+64.. contexts
+    inc     c                   ; context_index + 1
     call    decode_bit
     rr      d
     rr      e                   ; DE = length = (length >> 1) | (bit << 15);
-    inc     bc                  ; context_index += 2 ; TODO can be just `inc c` for 257.. and 257+64.. contexts
+    inc     c                   ; context_index += 2
 .loop_entry:
     call    decode_bit
     jr      c,.loop
