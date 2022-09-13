@@ -10,7 +10,7 @@
 ;; public API:
 ;;
 ;;     upkr.unpack
-;;         IN: IX = packed data, HL' (shadow HL) = destination
+;;         IN: IX = packed data, DE' (shadow DE) = destination
 ;;         OUT: IX = after packed data
 ;;         modifies: all registers except IY, requires 14 bytes of stack space
 ;;
@@ -64,7 +64,7 @@ int upkr_unpack(void* destination, void* compressed_data) {
     return write_ptr - (u8*)destination;
 }
 */
-; IN: IX = compressed_data, HL' = destination
+; IN: IX = compressed_data, DE' = destination
 unpack:
   ; ** reset probs to 0x80, also reset HL (state) to zero, and set BC to probs+context 0
     ld      hl,probs.c>>1
@@ -97,8 +97,8 @@ unpack:
     jr      nc,.decode_byte     ; while(byte < 256)
     ld      a,e
     exx
-    ld      (hl),a              ; *write_ptr++ = byte;
-    inc     hl
+    ld      (de),a              ; *write_ptr++ = byte;
+    inc     de
     exx
     jr      .decompress_data_reset_match
 
@@ -133,13 +133,12 @@ unpack:
     call    decode_length       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
-    push    hl
-.offset+*:  ld      de,0
-    sbc     hl,de               ; CF=0 from decode_length
-    pop     de
-    pop     bc
+    ld      h,d                 ; DE = write_ptr
+    ld      l,e
+.offset+*:  ld      bc,0
+    sbc     hl,bc               ; CF=0 from decode_length ; HL = write_ptr - offset
+    pop     bc                  ; BC = length
     ldir
-    ex      de,hl
     exx
     ld      d,b                 ; prev_was_match = non-zero
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop

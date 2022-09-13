@@ -24,9 +24,9 @@ start:
     ldi     a,(ix)              ; fake: ld a,(ix) : inc ix
     out     (254),a
   ; call unpack of next image directly into VRAM
-    ld      hl,$4000            ; target VRAM
+    ld      de,$4000            ; target VRAM
     exx
-  ; IX = packed data, HL' = destination ($4000)
+  ; IX = packed data, DE' = destination ($4000)
   ; returned IX will point right after the packed data
     call    upkr.unpack
   ; do some busy loop with CPU to delay between images
