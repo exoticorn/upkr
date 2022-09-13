@@ -135,8 +135,7 @@ unpack:
     exx
     push    hl
 .offset+*:  ld      de,0
-    or      a
-    sbc     hl,de
+    sbc     hl,de               ; CF=0 from decode_length
     pop     de
     pop     bc
     ldir
@@ -268,8 +267,8 @@ decode_length:
   ; IX = upkr_data_ptr
   ; BC = probs+context_index
   ; A' = upkr_current_byte (!!! init to 0x80 at start, not 0x00)
-  ; return length in DE
-    ld      de,$8000            ; length = 0 with positional-stop-bit
+  ; return length in DE, CF=0
+    ld      de,$7FFF            ; length = 0 with positional-stop-bit
     jr      .loop_entry
 .loop:
     inc     bc                  ; context_index + 1 ; TODO can be just `inc c` for 257.. and 257+64.. contexts
@@ -280,12 +279,12 @@ decode_length:
 .loop_entry:
     call    decode_bit
     jr      c,.loop
-    scf                         ; will become this final `| (1 << bit_pos)` bit
 .fix_bit_pos:
+    ccf                         ; NC will become this final `| (1 << bit_pos)` bit
     rr      d
     rr      e
-    jr      nc,.fix_bit_pos     ; until stop bit is reached (all bits did land to correct position)
-    ret
+    jr      c,.fix_bit_pos      ; until stop bit is reached (all bits did land to correct position)
+    ret                         ; return with CF=0 (important for unpack routine)
 
     DISPLAY "upkr.unpack total size: ",/D,$-unpack
 
