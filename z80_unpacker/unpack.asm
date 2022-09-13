@@ -239,19 +239,16 @@ decode_bit:
     jr      c,.bit_is_1
     ld      d,-16                   ; 0xF0
 .bit_is_1:                          ; D:E = -prob_offset:prob, A = prob
-    ;FIXME and + 4x rra will be probably shorter!
-    srl     a
-    srl     a
-    srl     a
-    srl     a
+    and     $F8
+    rra
+    rra
+    rra
+    rra
     adc     a,d                     ; A = -prob_offset + ((prob + 8) >> 4)
     neg
     add     a,e                     ; A = prob_offset + prob - ((prob + 8) >> 4)
     ld      (bc),a                  ; update probs[context_index]
     pop     af                      ; restore resulting CF = bit
-        ; TODO: check if it's possible to `cpl` instead of neg, have +1 on original prob,
-        ; and get correct CF=bit from `add a,e` then (without extra push+pop AF)
-        ; !!! I think this will **NOT** work, because clamping of prob ends with +-0 at both ends (cpl 0 -> 255 -> CF=1)
     pop     de
     ret
 
