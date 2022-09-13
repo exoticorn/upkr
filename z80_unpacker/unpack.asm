@@ -89,13 +89,12 @@ unpack:
     jr      c,.copy_chunk
 
   ; * extract byte from compressed data (literal)
-    ld      e,1                 ; E = byte = 1
+    inc     c                   ; C = byte = 1 (and also context_index)
 .decode_byte:
-    ld      c,e
     call    decode_bit          ; bit = upkr_decode_bit(byte);
-    rl      e                   ; byte = (byte << 1) + bit;
+    rl      c                   ; byte = (byte << 1) + bit;
     jr      nc,.decode_byte     ; while(byte < 256)
-    ld      a,e
+    ld      a,c
     exx
     ld      (de),a              ; *write_ptr++ = byte;
     inc     de
