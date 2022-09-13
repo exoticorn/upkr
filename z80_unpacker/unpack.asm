@@ -81,7 +81,6 @@ unpack:
     ; BC = probs (context_index 0), state HL = 0, A' = 0x80 (no source bits left in upkr_current_byte)
 
   ; ** main loop to decompress data
-    ld      (.offset),hl        ; offset = 0
 .decompress_data_reset_match:
     ld      d,0                 ; prev_was_match = 0;
 .decompress_data:
