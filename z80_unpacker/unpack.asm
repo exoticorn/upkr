@@ -84,8 +84,8 @@ unpack:
     ; BC = probs (context_index 0), state HL = 0, A' = 0x80 (no source bits left in upkr_current_byte)
 
   ; ** main loop to decompress data
-.decompress_data_reset_match:
-    ld      d,0                 ; prev_was_match = 0;
+    ; D = prev_was_match = uninitialised, literal is expected first => will reset D to "false"
+    ; values for false/true of prev_was_match are: false = high(probs), true = 1 + high(probs)
 .decompress_data:
     ld      c,0
     call    decode_bit          ; if(upkr_decode_bit(0))
@@ -102,16 +102,17 @@ unpack:
     ld      (de),a              ; *write_ptr++ = byte;
     inc     de
     exx
-    jr      .decompress_data_reset_match
+    ld      d,b                 ; prev_was_match = false
+    jr      .decompress_data
 
   ; * copy chunk of already decompressed data (match)
 .copy_chunk:
+    ld      a,b
     inc     b                   ; context_index = 256
         ;             if(prev_was_match || upkr_decode_bit(256)) {
         ;                 offset = upkr_decode_length(257) - 1;
         ;                 if (0 == offset) break;
         ;             }
-    xor     a
     cp      d                   ; CF = prev_was_match
     call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
     jr      nc,.keep_offset     ; if neither, keep old offset
@@ -140,7 +141,7 @@ unpack:
     pop     bc                  ; BC = length
     ldir
     exx
-    ld      d,b                 ; prev_was_match = non-zero
+    ld      d,b                 ; prev_was_match = true
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop
 
 /*
