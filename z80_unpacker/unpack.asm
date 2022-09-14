@@ -18,6 +18,9 @@
     OPT push reset --syntax=abf
     MODULE upkr
 
+NUMBER_BITS     EQU     16+15       ; context-bits per offset/length (16+15 for 16bit offsets/pointers)
+    ; numbers (offsets/lengths) are encoded like: 1a1b1c1d1e0 = 0000'0000'001e'dbca
+
 /*
 u8* upkr_data_ptr;
 u8 upkr_probs[1 + 255 + 1 + 2*32 + 2*32];
@@ -112,8 +115,8 @@ unpack:
     cp      d                   ; CF = prev_was_match
     call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
     jr      nc,.keep_offset     ; if neither, keep old offset
-    inc     c
-    call    decode_length
+    inc     c                   ; context_index to first "number" set for offsets decoding (257)
+    call    decode_number
     dec     de                  ; offset = upkr_decode_length(257) - 1;
     ld      a,d
     or      e
@@ -126,14 +129,14 @@ unpack:
         ;                 ++write_ptr;
         ;             }
         ;             prev_was_match = 1;
-    ld      c,low(257+64)       ; context_index = 257+64
-    call    decode_length       ; length = upkr_decode_length(257 + 64);
+    ld      c,low(257 + NUMBER_BITS)    ; context_index to second "number" set for lengths decoding
+    call    decode_number       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
     ld      h,d                 ; DE = write_ptr
     ld      l,e
 .offset+*:  ld      bc,0
-    sbc     hl,bc               ; CF=0 from decode_length ; HL = write_ptr - offset
+    sbc     hl,bc               ; CF=0 from decode_number ; HL = write_ptr - offset
     pop     bc                  ; BC = length
     ldir
     exx
@@ -258,7 +261,7 @@ int upkr_decode_length(int context_index) {
     return length | (1 << bit_pos);
 }
 */
-decode_length:
+decode_number:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
   ; BC = probs+context_index
@@ -291,7 +294,7 @@ decode_length:
     ENDIF
 
 probs:      EQU ($+255) & -$100                 ; probs array aligned to 256
-.real_c:    EQU 1 + 255 + 1 + 2*32 + 2*32       ; real size of probs array
+.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS     ; real size of probs array
 .c:         EQU (.real_c + 1) & -2              ; padding to even size (required by init code)
 .e:         EQU probs + .c
 
