@@ -2,7 +2,9 @@
 
 configs = [
     [:master, '-b'],
-    [:z80, '-b']
+    [:z80, '-b'],
+    [:z80, ['-b', '-r']],
+    ['old-prob-update', '-b']
 ]
 
 files = Dir[ARGV[0] + '/*'].select {|f| !(f =~ /\.txt$/) }
@@ -34,8 +36,8 @@ for config in configs
     config_results = []
     results << config_results
     for file in files
-        if system('cargo', 'run', '--release', 'pack', '-l', '9', config[1], file, '/tmp/out.upk') &&
-            system('cargo', 'run', '--release', 'unpack', config[1], '/tmp/out.upk', '/tmp/out.bin') &&
+        if system(*['cargo', 'run', '--release', 'pack', config[1], file, '/tmp/out.upk'].flatten) &&
+            system(*['cargo', 'run', '--release', 'unpack', config[1], '/tmp/out.upk', '/tmp/out.bin'].flatten) &&
             File.read(file) == File.read('/tmp/out.bin')
             size = File.size('/tmp/out.upk')
             config_results << size
