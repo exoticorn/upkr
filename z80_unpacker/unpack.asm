@@ -207,8 +207,9 @@ decode_bit:
     inc     a
   ; ** adjust state
     push    af
+    push    bc
+    ld      c,l                     ; C = (upkr_state & 255); (preserving the value)
     push    af
-    push    hl
     push    af
     jr      nc,.bit_is_0
     neg                             ; A = -prob == (256-prob), CF=1 preserved
@@ -216,22 +217,19 @@ decode_bit:
     ld      d,0
     ld      e,a                     ; DE = state_scale ; prob || (256-prob)
     ld      l,d                     ; H:L = (upkr_state>>8) : 0
-    ld      a,8                     ; counter
+    ld      b,8                     ; counter
 .mulLoop:
     add     hl,hl
     jr      nc,.mul0
     add     hl,de
 .mul0:
-    dec     a
-    jr      nz,.mulLoop             ; until HL = state_scale * (upkr_state>>8)
+    djnz    .mulLoop                ; until HL = state_scale * (upkr_state>>8), also BC becomes (upkr_state & 255)
+    add     hl,bc                   ; HL = state_scale * (upkr_state >> 8) + (upkr_state & 255)
     pop     af
     jr      nc,.bit_is_0_2
-    dec     d                       ; D = 0xFF (DE = -prob)
-    add     hl,de                   ; HL += -prob
-.bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8)
-    pop     de
-    ld      d,0                     ; DE = (upkr_state & 255)
-    add     hl,de                   ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
+    dec     h
+    add     hl,de                   ; HL += -prob (HL += (256 - prob) - 256)
+.bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
  ; *** adjust probs[context_index]
     pop     af                      ; restore prob and bit
     ld      e,a
@@ -246,6 +244,7 @@ decode_bit:
     adc     a,d                     ; A = -prob_offset + ((prob + 8) >> 4)
     neg
     add     a,e                     ; A = prob_offset + prob - ((prob + 8) >> 4)
+    pop     bc
     ld      (bc),a                  ; update probs[context_index]
     pop     af                      ; restore resulting CF = bit
     pop     de
