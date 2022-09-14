@@ -12,7 +12,7 @@
 ;;     upkr.unpack
 ;;         IN: IX = packed data, DE' (shadow DE) = destination
 ;;         OUT: IX = after packed data
-;;         modifies: all registers except IY, requires 14 bytes of stack space
+;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
     OPT push reset --syntax=abf
@@ -206,7 +206,6 @@ decode_bit:
     cp      l                       ; CF = bit = prob-1 < (upkr_state & 255) <=> prob <= (upkr_state & 255)
     inc     a
   ; ** adjust state
-    push    af
     push    bc
     ld      c,l                     ; C = (upkr_state & 255); (preserving the value)
     push    af
@@ -243,7 +242,8 @@ decode_bit:
     add     a,e                     ; A = prob_offset + prob - ((prob + 8) >> 4)
     pop     bc
     ld      (bc),a                  ; update probs[context_index]
-    pop     af                      ; restore resulting CF = bit
+    add     a,d                     ; bit=0: A = 23..249, D = 240 -> CF=1 || bit=1: D=0 -> CF=0
+    ccf                             ; resulting CF = bit restored
     pop     de
     ret
 
