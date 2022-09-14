@@ -1,0 +1,48 @@
+#!/bin/env ruby
+
+configs = [
+    [:master, '-b'],
+    [:z80, '-b']
+]
+
+files = Dir[ARGV[0] + '/*'].select {|f| !(f =~ /\.txt$/) }
+short_names = files.map {|f| File.basename(f)[..16] }
+results = []
+
+def print_results(configs, names, results)
+    configs.each_with_index do |config, i|
+        printf "%d: %s\n", i + 1, config
+    end
+    
+    print '                '
+    configs.each_index do |i|
+        printf "  %-4d", i + 1
+    end
+    puts
+    names.each_with_index do |name, i|
+        printf "%16s", name
+        for res in results
+            res = res[i]
+            printf "  %-4s", res if res
+        end
+        puts
+    end
+end
+
+for config in configs
+    raise unless system('git', 'checkout', config[0].to_s)
+    config_results = []
+    results << config_results
+    for file in files
+        if system('cargo', 'run', '--release', 'pack', '-l', '9', config[1], file, '/tmp/out.upk') &&
+            system('cargo', 'run', '--release', 'unpack', config[1], '/tmp/out.upk', '/tmp/out.bin') &&
+            File.read(file) == File.read('/tmp/out.bin')
+            size = File.size('/tmp/out.upk')
+            config_results << size
+        else
+            config_results << 'ERR'
+        end
+        print_results(configs, short_names, results)
+    end
+end
+
