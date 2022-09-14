@@ -210,7 +210,6 @@ decode_bit:
     push    bc
     ld      c,l                     ; C = (upkr_state & 255); (preserving the value)
     push    af
-    push    af
     jr      nc,.bit_is_0
     neg                             ; A = -prob == (256-prob), CF=1 preserved
 .bit_is_0:
@@ -226,16 +225,14 @@ decode_bit:
     djnz    .mulLoop                ; until HL = state_scale * (upkr_state>>8), also BC becomes (upkr_state & 255)
     add     hl,bc                   ; HL = state_scale * (upkr_state >> 8) + (upkr_state & 255)
     pop     af
+    ld      d,-16                   ; D = -prob_offset (-16 0xF0 when bit = 0)
     jr      nc,.bit_is_0_2
+    ld      d,b                     ; D = -prob_offset (0 when bit = 1) (also does fix following ADD)
     dec     h
     add     hl,de                   ; HL += -prob (HL += (256 - prob) - 256)
 .bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
  ; *** adjust probs[context_index]
-    pop     af                      ; restore prob and bit
-    ld      e,a
-    jr      c,.bit_is_1
-    ld      d,-16                   ; 0xF0
-.bit_is_1:                          ; D:E = -prob_offset:prob, A = prob
+    ld      e,a                     ; D:E = -prob_offset:prob, A = prob
     and     $F8
     rra
     rra
