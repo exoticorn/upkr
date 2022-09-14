@@ -33,13 +33,12 @@ impl<'a> Context<'a> {
 
     pub fn update(&mut self, bit: bool) {
         let old = self.state.contexts[self.index];
-        let offset = if !bit {
-            ONE_PROB as i32 >> UPDATE_RATE
+        if bit {
+            self.state.contexts[self.index] =
+                old - ((old as i32 + UPDATE_ADD) >> UPDATE_RATE) as u8;
         } else {
-            0
-        };
-
-        self.state.contexts[self.index] =
-            (offset + old as i32 - ((old as i32 + UPDATE_ADD) >> UPDATE_RATE)) as u8;
+            self.state.contexts[self.index] =
+                old + (((ONE_PROB as i32 - old as i32) + UPDATE_ADD) >> UPDATE_RATE) as u8;
+        }
     }
 }
