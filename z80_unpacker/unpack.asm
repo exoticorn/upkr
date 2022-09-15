@@ -12,11 +12,14 @@
 ;;     upkr.unpack
 ;;         IN: IX = packed data, DE' (shadow DE) = destination
 ;;         OUT: IX = after packed data
-;;         modifies: all registers except IY, requires 14 bytes of stack space
+;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
     OPT push reset --syntax=abf
     MODULE upkr
+
+NUMBER_BITS     EQU     16+15       ; context-bits per offset/length (16+15 for 16bit offsets/pointers)
+    ; numbers (offsets/lengths) are encoded like: 1a1b1c1d1e0 = 0000'0000'001e'dbca
 
 /*
 u8* upkr_data_ptr;
@@ -81,8 +84,8 @@ unpack:
     ; BC = probs (context_index 0), state HL = 0, A' = 0x80 (no source bits left in upkr_current_byte)
 
   ; ** main loop to decompress data
-.decompress_data_reset_match:
-    ld      d,0                 ; prev_was_match = 0;
+    ; D = prev_was_match = uninitialised, literal is expected first => will reset D to "false"
+    ; values for false/true of prev_was_match are: false = high(probs), true = 1 + high(probs)
 .decompress_data:
     ld      c,0
     call    decode_bit          ; if(upkr_decode_bit(0))
@@ -99,21 +102,22 @@ unpack:
     ld      (de),a              ; *write_ptr++ = byte;
     inc     de
     exx
-    jr      .decompress_data_reset_match
+    ld      d,b                 ; prev_was_match = false
+    jr      .decompress_data
 
   ; * copy chunk of already decompressed data (match)
 .copy_chunk:
+    ld      a,b
     inc     b                   ; context_index = 256
         ;             if(prev_was_match || upkr_decode_bit(256)) {
         ;                 offset = upkr_decode_length(257) - 1;
         ;                 if (0 == offset) break;
         ;             }
-    xor     a
     cp      d                   ; CF = prev_was_match
     call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
     jr      nc,.keep_offset     ; if neither, keep old offset
-    inc     c
-    call    decode_length
+    inc     c                   ; context_index to first "number" set for offsets decoding (257)
+    call    decode_number
     dec     de                  ; offset = upkr_decode_length(257) - 1;
     ld      a,d
     or      e
@@ -126,18 +130,18 @@ unpack:
         ;                 ++write_ptr;
         ;             }
         ;             prev_was_match = 1;
-    ld      c,low(257+64)       ; context_index = 257+64
-    call    decode_length       ; length = upkr_decode_length(257 + 64);
+    ld      c,low(257 + NUMBER_BITS)    ; context_index to second "number" set for lengths decoding
+    call    decode_number       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
     ld      h,d                 ; DE = write_ptr
     ld      l,e
 .offset+*:  ld      bc,0
-    sbc     hl,bc               ; CF=0 from decode_length ; HL = write_ptr - offset
+    sbc     hl,bc               ; CF=0 from decode_number ; HL = write_ptr - offset
     pop     bc                  ; BC = length
     ldir
     exx
-    ld      d,b                 ; prev_was_match = non-zero
+    ld      d,b                 ; prev_was_match = true
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop
 
 /*
@@ -202,9 +206,8 @@ decode_bit:
     cp      l                       ; CF = bit = prob-1 < (upkr_state & 255) <=> prob <= (upkr_state & 255)
     inc     a
   ; ** adjust state
-    push    af
-    push    af
-    push    hl
+    push    bc
+    ld      c,l                     ; C = (upkr_state & 255); (preserving the value)
     push    af
     jr      nc,.bit_is_0
     neg                             ; A = -prob == (256-prob), CF=1 preserved
@@ -212,28 +215,23 @@ decode_bit:
     ld      d,0
     ld      e,a                     ; DE = state_scale ; prob || (256-prob)
     ld      l,d                     ; H:L = (upkr_state>>8) : 0
-    ld      a,8                     ; counter
+    ld      b,8                     ; counter
 .mulLoop:
     add     hl,hl
     jr      nc,.mul0
     add     hl,de
 .mul0:
-    dec     a
-    jr      nz,.mulLoop             ; until HL = state_scale * (upkr_state>>8)
+    djnz    .mulLoop                ; until HL = state_scale * (upkr_state>>8), also BC becomes (upkr_state & 255)
+    add     hl,bc                   ; HL = state_scale * (upkr_state >> 8) + (upkr_state & 255)
     pop     af
+    ld      d,-16                   ; D = -prob_offset (-16 0xF0 when bit = 0)
     jr      nc,.bit_is_0_2
-    dec     d                       ; D = 0xFF (DE = -prob)
-    add     hl,de                   ; HL += -prob
-.bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8)
-    pop     de
-    ld      d,0                     ; DE = (upkr_state & 255)
-    add     hl,de                   ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
+    ld      d,b                     ; D = -prob_offset (0 when bit = 1) (also does fix following ADD)
+    dec     h
+    add     hl,de                   ; HL += -prob (HL += (256 - prob) - 256)
+.bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
  ; *** adjust probs[context_index]
-    pop     af                      ; restore prob and bit
-    ld      e,a
-    jr      c,.bit_is_1
-    ld      d,-16                   ; 0xF0
-.bit_is_1:                          ; D:E = -prob_offset:prob, A = prob
+    ld      e,a                     ; D:E = -prob_offset:prob, A = prob
     and     $F8
     rra
     rra
@@ -242,8 +240,10 @@ decode_bit:
     adc     a,d                     ; A = -prob_offset + ((prob + 8) >> 4)
     neg
     add     a,e                     ; A = prob_offset + prob - ((prob + 8) >> 4)
+    pop     bc
     ld      (bc),a                  ; update probs[context_index]
-    pop     af                      ; restore resulting CF = bit
+    add     a,d                     ; bit=0: A = 23..249, D = 240 -> CF=1 || bit=1: D=0 -> CF=0
+    ccf                             ; resulting CF = bit restored
     pop     de
     ret
 
@@ -258,7 +258,7 @@ int upkr_decode_length(int context_index) {
     return length | (1 << bit_pos);
 }
 */
-decode_length:
+decode_number:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
   ; BC = probs+context_index
@@ -291,7 +291,7 @@ decode_length:
     ENDIF
 
 probs:      EQU ($+255) & -$100                 ; probs array aligned to 256
-.real_c:    EQU 1 + 255 + 1 + 2*32 + 2*32       ; real size of probs array
+.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS     ; real size of probs array
 .c:         EQU (.real_c + 1) & -2              ; padding to even size (required by init code)
 .e:         EQU probs + .c
 
