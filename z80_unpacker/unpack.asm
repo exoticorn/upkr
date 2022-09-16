@@ -15,6 +15,8 @@
 ;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
+;     DEFINE UPKR_UNPACK_SPEED        ; uncomment to get larger but faster unpack routine
+
     OPT push reset --syntax=abf
     MODULE upkr
 
@@ -215,6 +217,10 @@ decode_bit:
     ld      d,0
     ld      e,a                     ; DE = state_scale ; prob || (256-prob)
     ld      l,d                     ; H:L = (upkr_state>>8) : 0
+
+  IFNDEF UPKR_UNPACK_SPEED
+    ;; looped MUL for minimum unpack size
+
     ld      b,8                     ; counter
 .mulLoop:
     add     hl,hl
@@ -222,6 +228,19 @@ decode_bit:
     add     hl,de
 .mul0:
     djnz    .mulLoop                ; until HL = state_scale * (upkr_state>>8), also BC becomes (upkr_state & 255)
+  ELSE
+    ;;; unrolled MUL for better performance, +25 bytes unpack size
+
+    ld      b,d
+    DUP     8
+        add     hl,hl
+        jr      nc,000_f
+        add     hl,de
+000:
+    EDUP
+
+  ENDIF
+
     add     hl,bc                   ; HL = state_scale * (upkr_state >> 8) + (upkr_state & 255)
     pop     af
     ld      d,-16                   ; D = -prob_offset (-16 0xF0 when bit = 0)
