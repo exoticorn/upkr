@@ -15,6 +15,10 @@
 ;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
+;     DEFINE BACKWARDS_UNPACK         ; uncomment to build backwards depacker
+            ; initial IX points at last byte of compressed data
+            ; initial DE' points at last byte of unpacked data
+
 ;     DEFINE UPKR_UNPACK_SPEED        ; uncomment to get larger but faster unpack routine
 
     OPT push reset --syntax=abf
@@ -102,7 +106,7 @@ unpack:
     ld      a,c
     exx
     ld      (de),a              ; *write_ptr++ = byte;
-    inc     de
+    IFNDEF BACKWARDS_UNPACK : inc de : ELSE : dec de : ENDIF
     exx
     ld      d,b                 ; prev_was_match = false
     jr      .decompress_data
@@ -139,9 +143,13 @@ unpack:
     ld      h,d                 ; DE = write_ptr
     ld      l,e
 .offset+*:  ld      bc,0
+    IFNDEF BACKWARDS_UNPACK
     sbc     hl,bc               ; CF=0 from decode_number ; HL = write_ptr - offset
+    ELSE
+    add     hl,bc               ; HL = write_ptr + offset
+    ENDIF
     pop     bc                  ; BC = length
-    ldir
+    IFNDEF BACKWARDS_UNPACK : ldir : ELSE : lddr : ENDIF
     exx
     ld      d,b                 ; prev_was_match = true
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop
@@ -195,7 +203,7 @@ decode_bit:
     jr      nz,.has_bit             ; CF=data, ZF=0 -> some bits + stop bit still available
   ; CF=1 (by stop bit)
     ld      a,(ix)
-    inc     ix                      ; upkr_current_byte = *upkr_data_ptr++;
+    IFNDEF BACKWARDS_UNPACK : inc ix : ELSE : dec ix : ENDIF    ; upkr_current_byte = *upkr_data_ptr++;
     adc     a,a                     ; CF=data, b0=1 as new stop bit
 .has_bit:
     adc     hl,hl                   ; upkr_state = (upkr_state << 1) + (upkr_current_byte >> 7);
@@ -306,12 +314,12 @@ decode_number:
     ; reserve space for probs array without emitting any machine code (using only EQU)
 
     IFDEF UPKR_PROBS_ORIGIN     ; if specific address is defined by user, move probs array there
-    ORG UPKR_PROBS_ORIGIN
+probs:      EQU ((UPKR_PROBS_ORIGIN) + 255) & -$100     ; probs array aligned to 256
+    ELSE
+probs:      EQU ($ + 255) & -$100                       ; probs array aligned to 256
     ENDIF
-
-probs:      EQU ($+255) & -$100                 ; probs array aligned to 256
-.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS     ; real size of probs array
-.c:         EQU (.real_c + 1) & -2              ; padding to even size (required by init code)
+.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS             ; real size of probs array
+.c:         EQU (.real_c + 1) & -2                      ; padding to even size (required by init code)
 .e:         EQU probs + .c
 
     DISPLAY "upkr.unpack probs array placed at: ",/A,probs,",\tsize: ",/A,probs.c
