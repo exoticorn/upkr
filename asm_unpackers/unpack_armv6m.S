@@ -111,47 +111,44 @@ upkr_decode_length:
 
 .type upkr_decode_bit, %function
 // r0 .. tmp / prob (saved)
-// r1 .. out_ptr (modified)
+// r1 .. in_ptr (modified)
 // r2 .. state (modified)
 // r3 .. scratch (saved)
 // r4 ..
 // r5 .. context index (preserved)
 // r6 .. bit (returned)
 // r7 .. probs ptr (preserved)
-upkr_decode_bit:
-    push { r0, r3, lr }
-
-.Lstate_loop:
-    lsrs r3, r2, #12
-    bne 1f
+upkr_fill_state:
     lsls r2, r2, #8
     ldrb r6, [r1]
     adds r1, r1, #1
     orrs r2, r2, r6
-    b .Lstate_loop
-1:
+
+upkr_decode_bit:
+    lsrs r6, r2, #12
+    beq upkr_fill_state
+
+    push { r0, r1, r3, lr }
 
     ldrb r0, [r7, r5]
 
     lsrs r3, r2, #8
-    uxtb r2, r2
+    uxtb r1, r2
 
-    subs r6, r2, r0
+    subs r6, r1, r0
     blt 1f
 
-    subs r2, r2, r0
+    subs r1, r2, r0
     rsbs r0, r0, #0
-    uxtb r0, r0
 1:
 
     muls r3, r3, r0
-    adds r2, r2, r3
+    adds r2, r1, r3
 
     rsbs r3, r0, #0
     uxtb r3, r3
-    adds r3, r3, #8
     lsrs r3, r3, #4
-    adds r0, r0, r3
+    adcs r0, r0, r3
 
     cmp r6, #0
     blt 1f
@@ -162,4 +159,4 @@ upkr_decode_bit:
     strb r0, [r7, r5]
 
     lsrs r6, r6, #31
-    pop { r0, r3, pc }
+    pop { r0, r1, r3, pc }
