@@ -6,9 +6,9 @@ test_riscv64: build/unpack_riscv64
 	qemu-riscv64 $< test_data.upk /tmp/out.bin
 	cmp test_data.bin /tmp/out.bin
 
-build/unpack_armv6m: ../c_unpacker/main.c ../c_unpacker/unpack.c
+build/unpack_armv6m: ../c_unpacker/main.c unpack_armv6m.S
 	mkdir -p build
-	arm-linux-gnueabihf-gcc -g -static -o $@ $?
+	arm-linux-gnueabihf-gcc -g -static -o $@ $^
 
 test_armv6m: build/unpack_armv6m
 	qemu-arm $< test_data.upk /tmp/out.bin

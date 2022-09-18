@@ -39,8 +39,7 @@ upkr_unpack:
     // r6 = 1
     lsls r5, r6, #8
     cmp r4, #0
-    mov r4, r6 // = 1
-    bne 1f
+    beq 1f
 
     bl upkr_decode_bit
     beq 2f
@@ -49,8 +48,7 @@ upkr_unpack:
     adds r5, r5, #1
     bl upkr_decode_length
     subs r5, r5, #1
-    // r4 = 1
-    subs r3, r4, r6
+    subs r3, r6, r4
     beq .Lend
 2:
 
@@ -60,19 +58,18 @@ upkr_unpack:
     ldrb r5, [r0, r3]
     strb r5, [r0]
     adds r0, r0, #1
-    subs r6, r6, #1
+    subs r4, r4, #1
     bne .Lcopy_loop
     b .Lloop
 
 .Ldata:
-    movs r4, #0
     movs r5, #1
 
 .Ldata_loop:
     bl upkr_decode_bit
     lsls r5, r5, #1
     adds r5, r5, r6
-    lsrs r6, r5, #8
+    lsrs r4, r5, #8
     beq .Ldata_loop
 
     strb r5, [r0]
@@ -87,15 +84,15 @@ upkr_unpack:
 // r0 .. length tmp (saved)
 // r1 ..
 // r2 ..
-// r3 ..
-// r4 .. bit pos (saved)
+// r3 .. bit pos (saved)
+// r4 .. length (returned)
 // r5 .. content index (saved)
-// r6 .. length (returned)
+// r6 ..
 // r7 ..
 upkr_decode_length:
-    push { r0, r4, r5, lr }
+    push { r0, r3, r5, r6, lr }
 
-    movs r4, #0
+    movs r3, #0
     movs r0, #0
 .Lbit_loop:
     bl upkr_decode_bit
@@ -104,16 +101,16 @@ upkr_decode_length:
     adds r5, r5, #1
     bl upkr_decode_bit
     adds r5, r5, #1
-    lsls r6, r6, r4
-    adds r4, r4, #1
+    lsls r6, r6, r3
+    adds r3, r3, #1
     orrs r0, r0, r6
     b .Lbit_loop
 1:
-    movs r6, #1
-    lsls r6, r6, r4
-    orrs r6, r6, r0
+    movs r4, #1
+    lsls r4, r4, r3
+    orrs r4, r4, r0
 
-    pop { r0, r4, r5, pc }
+    pop { r0, r3, r5, r6, pc }
 
 .type upkr_decode_bit, %function
 // r0 .. tmp / prob (saved)
