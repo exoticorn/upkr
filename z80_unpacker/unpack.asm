@@ -122,8 +122,7 @@ unpack:
     cp      d                   ; CF = prev_was_match
     call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
     jr      nc,.keep_offset     ; if neither, keep old offset
-    inc     c                   ; context_index to first "number" set for offsets decoding (257)
-    call    decode_number
+    call    decode_number       ; context_index is already 257-1 as needed by decode_number
     dec     de                  ; offset = upkr_decode_length(257) - 1;
     ld      a,d
     or      e
@@ -136,7 +135,7 @@ unpack:
         ;                 ++write_ptr;
         ;             }
         ;             prev_was_match = 1;
-    ld      c,low(257 + NUMBER_BITS)    ; context_index to second "number" set for lengths decoding
+    ld      c,low(257 + NUMBER_BITS - 1)    ; context_index to second "number" set for lengths decoding
     call    decode_number       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
@@ -288,7 +287,7 @@ int upkr_decode_length(int context_index) {
 decode_number:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
-  ; BC = probs+context_index
+  ; BC = probs+context_index-1
   ; A' = upkr_current_byte (!!! init to 0x80 at start, not 0x00)
   ; return length in DE, CF=0
     ld      de,$7FFF            ; length = 0 with positional-stop-bit
@@ -298,8 +297,8 @@ decode_number:
     call    decode_bit
     rr      d
     rr      e                   ; DE = length = (length >> 1) | (bit << 15);
-    inc     c                   ; context_index += 2
 .loop_entry:
+    inc     c                   ; context_index += 2
     call    decode_bit
     jr      c,.loop
 .fix_bit_pos:
