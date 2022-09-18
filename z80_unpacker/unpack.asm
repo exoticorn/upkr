@@ -227,8 +227,8 @@ decode_bit:
     ld      l,d                     ; H:L = (upkr_state>>8) : 0
 
   IFNDEF UPKR_UNPACK_SPEED
-    ;; looped MUL for minimum unpack size
 
+    ;; looped MUL for minimum unpack size
     ld      b,8                     ; counter
 .mulLoop:
     add     hl,hl
@@ -236,15 +236,16 @@ decode_bit:
     add     hl,de
 .mul0:
     djnz    .mulLoop                ; until HL = state_scale * (upkr_state>>8), also BC becomes (upkr_state & 255)
-  ELSE
-    ;;; unrolled MUL for better performance, +25 bytes unpack size
 
+  ELSE
+
+    ;;; unrolled MUL for better performance, +25 bytes unpack size
     ld      b,d
     DUP     8
         add     hl,hl
-        jr      nc,000_f
+        jr      nc,0_f
         add     hl,de
-000:
+0:
     EDUP
 
   ENDIF
