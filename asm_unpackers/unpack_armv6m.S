@@ -1,3 +1,6 @@
+// armv6-m upkr unpacker by yrlf
+// some optimizations by exoticorn
+
 .syntax unified
 .thumb
 
@@ -45,14 +48,12 @@ upkr_unpack:
     beq 2f
 
 1:
-    adds r5, r5, #1
     bl upkr_decode_length
-    subs r5, r5, #1
     subs r3, r6, r4
     beq .Lend
 2:
 
-    adds r5, r5, #65
+    adds r5, r5, #64
     bl upkr_decode_length
 .Lcopy_loop:
     ldrb r5, [r0, r3]
@@ -95,12 +96,12 @@ upkr_decode_length:
     movs r3, #0
     movs r0, #0
 .Lbit_loop:
+    adds r5, r5, #1
     bl upkr_decode_bit
     beq 1f
 
     adds r5, r5, #1
     bl upkr_decode_bit
-    adds r5, r5, #1
     lsls r6, r6, r3
     adds r3, r3, #1
     orrs r0, r0, r6
