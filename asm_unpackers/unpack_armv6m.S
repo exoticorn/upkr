@@ -68,8 +68,7 @@ upkr_unpack:
 
 .Ldata_loop:
     bl upkr_decode_bit
-    lsls r5, r5, #1
-    adds r5, r5, r6
+    adcs r5, r5, r5
     lsrs r4, r5, #8
     beq .Ldata_loop
 
@@ -93,7 +92,7 @@ upkr_unpack:
 upkr_decode_length:
     push { r0, r3, r5, r6, lr }
 
-    movs r3, #0
+    movs r4, #1
     movs r0, #0
 .Lbit_loop:
     adds r5, r5, #1
@@ -102,13 +101,12 @@ upkr_decode_length:
 
     adds r5, r5, #1
     bl upkr_decode_bit
-    lsls r6, r6, r3
-    adds r3, r3, #1
-    orrs r0, r0, r6
+    beq 2f
+    orrs r0, r0, r4
+2:
+    lsls r4, r4, #1
     b .Lbit_loop
 1:
-    movs r4, #1
-    lsls r4, r4, r3
     orrs r4, r4, r0
 
     pop { r0, r3, r5, r6, pc }
@@ -141,8 +139,7 @@ upkr_decode_bit:
     uxtb r2, r2
 
     subs r6, r2, r0
-    lsrs r6, r6, #31
-    bne 1f
+    blt 1f
 
     subs r2, r2, r0
     rsbs r0, r0, #0
@@ -159,12 +156,12 @@ upkr_decode_bit:
     adds r0, r0, r3
 
     cmp r6, #0
-    bne 1f
+    blt 1f
 
     rsbs r0, r0, #0
 1:
 
     strb r0, [r7, r5]
 
-    cmp r6, #0
+    lsrs r6, r6, #31
     pop { r0, r3, pc }
