@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int upkr_unpack(void* destination, void* compressed_data);
+void* upkr_unpack(void* destination, void* compressed_data);
 
 int main(int argn, char** argv) {
   void* input_buffer = malloc(1024*1024);
@@ -13,7 +13,8 @@ int main(int argn, char** argv) {
   
   printf("Compressed size: %d\n", in_size);
   
-  int out_size = upkr_unpack(output_buffer, input_buffer);
+  void* end_ptr = upkr_unpack(output_buffer, input_buffer);
+  int out_size = (char*)end_ptr - (char*)output_buffer;
   
   printf("Uncompressed size: %d\n", out_size);
   
