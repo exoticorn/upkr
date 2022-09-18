@@ -250,27 +250,26 @@ decode_bit:
   ENDIF
 
     add     hl,bc                   ; HL = state_scale * (upkr_state >> 8) + (upkr_state & 255)
-    pop     af
-    ld      d,-16                   ; D = -prob_offset (-16 0xF0 when bit = 0)
+    pop     af                      ; restore prob and CF=bit
     jr      nc,.bit_is_0_2
-    ld      d,b                     ; D = -prob_offset (0 when bit = 1) (also does fix following ADD)
-    dec     h
-    add     hl,de                   ; HL += -prob (HL += (256 - prob) - 256)
-.bit_is_0_2:                        ; HL = state_offset + state_scale * (upkr_state >> 8) + (upkr_state & 255) ; new upkr_state
+    dec     d                       ; DE = -prob (also D = bit ? $FF : $00)
+    add     hl,de                   ; HL += -prob
+    ; ^ this always preserves CF=1, because (state>>8) >= 128, state_scale: 7..250, prob: 7..250,
+    ; so 7*128 > 250 and thus edge case `ADD hl=(7*128+0),de=(-250)` => CF=1
+.bit_is_0_2:
  ; *** adjust probs[context_index]
-    ld      e,a                     ; D:E = -prob_offset:prob, A = prob
-    and     $F8
+    ld      e,a                     ; preserve prob
+    rra                             ; + (bit<<4) ; part of -prob_offset, needs another -16
+    and     $FC                     ; clear/keep correct bits to get desired (prob>>4) + extras, CF=0
     rra
     rra
-    rra
-    rra
-    adc     a,d                     ; A = -prob_offset + ((prob + 8) >> 4)
-    neg
-    add     a,e                     ; A = prob_offset + prob - ((prob + 8) >> 4)
+    rra                             ; A = (bit<<4) + (prob>>4), CF=(prob & 8)
+    adc     a,-16                   ; A = (bit<<4) - 16 + ((prob + 8)>>4) ; -prob_offset = (bit<<4) - 16
+    sub     e                       ; A = (bit<<4) - 16 + ((prob + 8)>>4) - prob ; = ((prob + 8)>>4) - prob_offset - prob
+    neg                             ; A = prob_offset + prob - ((prob + 8)>>4)
     pop     bc
-    ld      (bc),a                  ; update probs[context_index]
-    add     a,d                     ; bit=0: A = 23..249, D = 240 -> CF=1 || bit=1: D=0 -> CF=0
-    ccf                             ; resulting CF = bit restored
+    ld      (bc),a                  ; probs[context_index] = prob_offset + prob - ((prob + 8) >> 4);
+    add     a,d                     ; restore CF = bit (D = bit ? $FF : $00 && A > 0)
     pop     de
     ret
 
