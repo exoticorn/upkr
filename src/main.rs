@@ -23,7 +23,7 @@ fn main() -> Result<()> {
 
             let mut pb = pbr::ProgressBar::new(data.len() as u64);
             pb.set_units(pbr::Units::Bytes);
-            let packed_data = upkr::pack(
+            let mut packed_data = upkr::pack(
                 &data,
                 level,
                 use_bitstream,
@@ -32,6 +32,10 @@ fn main() -> Result<()> {
                 }),
             );
             pb.finish();
+
+            if reverse {
+                packed_data.reverse();
+            }
 
             println!(
                 "Compressed {} bytes to {} bytes ({}%)",
@@ -50,6 +54,9 @@ fn main() -> Result<()> {
 
             let mut data = vec![];
             File::open(infile)?.read_to_end(&mut data)?;
+            if reverse {
+                data.reverse();
+            }
             let mut unpacked_data = upkr::unpack(&data, use_bitstream);
             if reverse {
                 unpacked_data.reverse();
