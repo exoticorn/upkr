@@ -8,7 +8,7 @@
 
 #define ALIGNUP(n, align) (((n) + (align) - 1) & ~((align) - 1))
 #define PROB_LEN (1 + 255 + 1 + 2*32 + 2*32)
-#define DATA_OFF ALIGNUP(PROB_LEN, 4)
+#define FRAME_SIZE ALIGNUP(PROB_LEN, 4)
 
 // auto upkr_unpack(uint8_t * out, uint8_t * in) -> tuple<uint8_t *, uint8_t *>
 .global upkr_unpack
@@ -17,13 +17,13 @@
 // r1 .. in_ptr (returned)
 // r2 .. state
 // r3 .. offset
-// r4 .. prev_was_match
+// r4 .. prev_was_literal / decode_length ret
 // r5 .. subroutine arg (preserved)
-// r6 .. subroutine ret
+// r6 .. decode_bit ret
 // r7 .. probs ptr
 upkr_unpack:
     push { r4, r5, r6, r7, lr }
-    sub sp, sp, #DATA_OFF
+    sub sp, sp, #FRAME_SIZE
 
     mov r7, sp
     movs r2, #255
@@ -77,20 +77,20 @@ upkr_unpack:
     b .Lloop
 
 .Lend:
-    add sp, sp, #DATA_OFF
+    add sp, sp, #FRAME_SIZE
     pop { r4, r5, r6, r7, pc }
 
 .type upkr_decode_length, %function
 // r0 .. length tmp (saved)
 // r1 ..
 // r2 ..
-// r3 .. bit pos (saved)
+// r3 ..
 // r4 .. length (returned)
-// r5 .. content index (saved)
-// r6 ..
+// r5 .. context index (saved)
+// r6 .. (saved)
 // r7 ..
 upkr_decode_length:
-    push { r0, r3, r5, r6, lr }
+    push { r0, r5, r6, lr }
 
     movs r4, #1
     movs r0, #0
@@ -109,7 +109,7 @@ upkr_decode_length:
 1:
     orrs r4, r4, r0
 
-    pop { r0, r3, r5, r6, pc }
+    pop { r0, r5, r6, pc }
 
 .type upkr_decode_bit, %function
 // r0 .. tmp / prob (saved)
@@ -117,7 +117,7 @@ upkr_decode_length:
 // r2 .. state (modified)
 // r3 .. scratch (saved)
 // r4 ..
-// r5 .. content index (preserved)
+// r5 .. context index (preserved)
 // r6 .. bit (returned)
 // r7 .. probs ptr (preserved)
 upkr_decode_bit:
