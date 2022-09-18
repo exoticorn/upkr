@@ -139,16 +139,19 @@ unpack:
     call    decode_number       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
-    ld      h,d                 ; DE = write_ptr
-    ld      l,e
-.offset+*:  ld      bc,0
     IFNDEF BACKWARDS_UNPACK
-    sbc     hl,bc               ; CF=0 from decode_number ; HL = write_ptr - offset
+        ld      h,d             ; DE = write_ptr
+        ld      l,e
+.offset+*:  ld  bc,0
+        sbc     hl,bc           ; CF=0 from decode_number ; HL = write_ptr - offset
+        pop     bc              ; BC = length
+        ldir
     ELSE
-    add     hl,bc               ; HL = write_ptr + offset
+.offset+*:  ld  hl,0
+        add     hl,de           ; HL = write_ptr + offset
+        pop     bc              ; BC = length
+        lddr
     ENDIF
-    pop     bc                  ; BC = length
-    IFNDEF BACKWARDS_UNPACK : ldir : ELSE : lddr : ENDIF
     exx
     ld      d,b                 ; prev_was_match = true
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop
