@@ -301,13 +301,12 @@ decode_number:
   ; BC = probs+context_index-1
   ; A' = upkr_current_byte (!!! init to 0x80 at start, not 0x00)
   ; return length in DE, CF=0
-    ld      de,$7FFF            ; length = 0 with positional-stop-bit
-    jr      .loop_entry
+    ld      de,$FFFF            ; length = 0 with positional-stop-bit
+    or      a                   ; CF=0 to skip getting data bit and use only `rr d : rr e` to fix init DE
 .loop:
-    call    inc_c_decode_bit    ; context_index + 1
+    call    c,inc_c_decode_bit  ; get data bit, context_index + 1 / if CF=0 just add stop bit into DE init
     rr      d
     rr      e                   ; DE = length = (length >> 1) | (bit << 15);
-.loop_entry:
     call    inc_c_decode_bit    ; context_index += 2
     jr      c,.loop
 .fix_bit_pos:
