@@ -187,6 +187,9 @@ int upkr_decode_bit(int context_index) {
     return bit;
 }
 */
+inc_c_decode_bit:
+  ; ++low(context_index) before decode_bit (to get -1B by two calls in decode_number)
+    inc     c
 decode_bit:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
@@ -298,13 +301,11 @@ decode_number:
     ld      de,$7FFF            ; length = 0 with positional-stop-bit
     jr      .loop_entry
 .loop:
-    inc     c                   ; context_index + 1
-    call    decode_bit
+    call    inc_c_decode_bit    ; context_index + 1
     rr      d
     rr      e                   ; DE = length = (length >> 1) | (bit << 15);
 .loop_entry:
-    inc     c                   ; context_index += 2
-    call    decode_bit
+    call    inc_c_decode_bit    ; context_index += 2
     jr      c,.loop
 .fix_bit_pos:
     ccf                         ; NC will become this final `| (1 << bit_pos)` bit
