@@ -15,7 +15,7 @@
 ;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
-;     DEFINE BACKWARDS_UNPACK         ; uncomment to build backwards depacker
+;     DEFINE BACKWARDS_UNPACK         ; uncomment to build backwards depacker (write_ptr--, upkr_data_ptr--)
             ; initial IX points at last byte of compressed data
             ; initial DE' points at last byte of unpacked data
 
@@ -140,6 +140,7 @@ unpack:
     push    de
     exx
     IFNDEF BACKWARDS_UNPACK
+        ; forward unpack (write_ptr++, upkr_data_ptr++)
         ld      h,d             ; DE = write_ptr
         ld      l,e
 .offset+*:  ld  bc,0
@@ -147,6 +148,7 @@ unpack:
         pop     bc              ; BC = length
         ldir
     ELSE
+        ; backward unpack (write_ptr--, upkr_data_ptr--)
 .offset+*:  ld  hl,0
         add     hl,de           ; HL = write_ptr + offset
         pop     bc              ; BC = length
@@ -310,6 +312,37 @@ decode_number:
     rr      e
     jr      c,.fix_bit_pos      ; until stop bit is reached (all bits did land to correct position)
     ret                         ; return with CF=0 (important for unpack routine)
+
+/*
+ archived: negligibly faster but +6B longer decode_number variant using HL' and BC' to
+ do `number|=(1<<bit_pos);` type of logic in single loop.
+*/
+; decode_number:
+;     exx
+;     ld      bc,1
+;     ld      l,b
+;     ld      h,b                 ; HL = 0
+; .loop
+;     exx
+;     inc     c
+;     call    decode_bit
+;     jr      nc,.done
+;     inc     c
+;     call    decode_bit
+;     exx
+;     jr      nc,.b0
+;     add     hl,bc
+; .b0:
+;     sla     c
+;     rl      b
+;     jr      .loop
+; .done:
+;     exx
+;     add     hl,bc
+;     push    hl
+;     exx
+;     pop     de
+;     ret
 
     DISPLAY "upkr.unpack total size: ",/D,$-unpack
 
