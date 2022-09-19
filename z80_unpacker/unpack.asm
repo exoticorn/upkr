@@ -4,7 +4,7 @@
 ;; initial version by Peter "Ped" Helcmanovsky (C) 2022, licensed same as upkr project ("unlicensed")
 ;; to assemble use z00m's sjasmplus: https://github.com/z00m128/sjasmplus
 ;;
-;; you can define UPKR_PROBS_ORIGIN to specific 256 byte aligned address for probs array (386 bytes),
+;; you can define UPKR_PROBS_ORIGIN to specific 256 byte aligned address for probs array (320 bytes),
 ;; otherwise it will be positioned after the unpacker code (256 aligned)
 ;;
 ;; public API:
