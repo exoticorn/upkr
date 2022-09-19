@@ -316,6 +316,21 @@ decode_number:
     jr      c,.fix_bit_pos      ; until stop bit is reached (all bits did land to correct position)
     ret                         ; return with CF=0 (important for unpack routine)
 
+    DISPLAY "upkr.unpack total size: ",/D,$-unpack
+
+    ; reserve space for probs array without emitting any machine code (using only EQU)
+
+    IFDEF UPKR_PROBS_ORIGIN     ; if specific address is defined by user, move probs array there
+probs:      EQU ((UPKR_PROBS_ORIGIN) + 255) & -$100     ; probs array aligned to 256
+    ELSE
+probs:      EQU ($ + 255) & -$100                       ; probs array aligned to 256
+    ENDIF
+.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS             ; real size of probs array
+.c:         EQU (.real_c + 1) & -2                      ; padding to even size (required by init code)
+.e:         EQU probs + .c
+
+    DISPLAY "upkr.unpack probs array placed at: ",/A,probs,",\tsize: ",/A,probs.c
+
 /*
  archived: negligibly faster but +6B longer decode_number variant using HL' and BC' to
  do `number|=(1<<bit_pos);` type of logic in single loop.
@@ -347,20 +362,20 @@ decode_number:
 ;     pop     de
 ;     ret
 
-    DISPLAY "upkr.unpack total size: ",/D,$-unpack
-
-    ; reserve space for probs array without emitting any machine code (using only EQU)
-
-    IFDEF UPKR_PROBS_ORIGIN     ; if specific address is defined by user, move probs array there
-probs:      EQU ((UPKR_PROBS_ORIGIN) + 255) & -$100     ; probs array aligned to 256
-    ELSE
-probs:      EQU ($ + 255) & -$100                       ; probs array aligned to 256
-    ENDIF
-.real_c:    EQU 1 + 255 + 1 + 2*NUMBER_BITS             ; real size of probs array
-.c:         EQU (.real_c + 1) & -2                      ; padding to even size (required by init code)
-.e:         EQU probs + .c
-
-    DISPLAY "upkr.unpack probs array placed at: ",/A,probs,",\tsize: ",/A,probs.c
+/*
+ archived: possible LUT variant of updating probs value, requires 512-aligned 512B table (not tested)
+*/
+; code is replacing decode_bit from "; *** adjust probs[context_index]", followed by `ld (bc),a : add a,d ...`
+;     ld      c,a
+;     ld      a,high(probs_update_table)/2    ; must be 512 aligned
+;     rla
+;     ld      b,a
+;     ld      a,(bc)
+;     pop     bc
+; -------------------------------------------
+; probs_update_table: EQU probs-512
+; -------------------------------------------
+; table generator is not obvious and probably not short either, 20+ bytes almost for sure, maybe even 30-40
 
     ENDMODULE
     OPT pop
