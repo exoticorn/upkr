@@ -21,6 +21,9 @@
 
 ;     DEFINE UPKR_UNPACK_SPEED        ; uncomment to get larger but faster unpack routine
 
+; code size hint: if you put probs array just ahead of BASIC entry point, you will get BC
+; initialised to probs.e by BASIC `USR` command and you can remove it from unpack init (-3B)
+
     OPT push reset --syntax=abf
     MODULE upkr
 
