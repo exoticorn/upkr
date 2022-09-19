@@ -17,6 +17,14 @@ test_armv6m: build/unpack_armv6m
 build/unpack_armv6m.bin: unpack_armv6m.S
 	arm-none-eabi-gcc -march=armv6-m -c -o build/unpack_armv6m.o $?
 	arm-none-eabi-objcopy -O binary --only-section=.text build/unpack_armv6m.o $@
+	
+build/unpack_c: ../c_unpacker/main.c ../c_unpacker/unpack.c
+	mkdir -p build
+	gcc -g -o $@ $^
+
+test_c: build/unpack_c
+	$< test_data.upk /tmp/out.bin
+	cmp test_data.bin /tmp/out.bin
 
 sizes: build/unpack_armv6m.bin
 	ls -l build/*.bin
