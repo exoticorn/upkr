@@ -13,12 +13,19 @@ pub fn pack(
     data: &[u8],
     level: u8,
     use_bitstream: bool,
+    parity_contexts: usize,
     progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     if level == 0 {
-        greedy_packer::pack(data, use_bitstream, progress_callback)
+        greedy_packer::pack(data, use_bitstream, parity_contexts, progress_callback)
     } else {
-        parsing_packer::pack(data, level, use_bitstream, progress_callback)
+        parsing_packer::pack(
+            data,
+            level,
+            use_bitstream,
+            parity_contexts,
+            progress_callback,
+        )
     }
 }
 

@@ -6,14 +6,25 @@ use crate::match_finder::MatchFinder;
 use crate::rans::{CostCounter, RansCoder};
 use crate::{lz, ProgressCallback};
 
-pub fn pack(data: &[u8], level: u8, use_bitstream: bool, progress_cb: Option<ProgressCallback>) -> Vec<u8> {
-    let mut parse = parse(data, Config::from_level(level), progress_cb);
+pub fn pack(
+    data: &[u8],
+    level: u8,
+    use_bitstream: bool,
+    parity_contexts: usize,
+    progress_cb: Option<ProgressCallback>,
+) -> Vec<u8> {
+    let mut parse = parse(
+        data,
+        Config::from_level(level),
+        parity_contexts,
+        progress_cb,
+    );
     let mut ops = vec![];
     while let Some(link) = parse {
         ops.push(link.op);
         parse = link.prev.clone();
     }
-    let mut state = lz::CoderState::new();
+    let mut state = lz::CoderState::new(parity_contexts);
     let mut coder = RansCoder::new(use_bitstream);
     for op in ops.into_iter().rev() {
         op.encode(&mut coder, &mut state);
@@ -38,6 +49,7 @@ type Arrivals = HashMap<usize, Vec<Arrival>>;
 fn parse(
     data: &[u8],
     config: Config,
+    parity_contexts: usize,
     mut progress_cb: Option<ProgressCallback>,
 ) -> Option<Rc<Parse>> {
     let mut match_finder = MatchFinder::new(data)
@@ -129,7 +141,7 @@ fn parse(
         0,
         Arrival {
             parse: None,
-            state: lz::CoderState::new(),
+            state: lz::CoderState::new(parity_contexts),
             cost: 0.0,
         },
         max_arrivals,

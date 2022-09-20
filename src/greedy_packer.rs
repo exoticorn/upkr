@@ -6,11 +6,12 @@ use crate::ProgressCallback;
 pub fn pack(
     data: &[u8],
     use_bitstream: bool,
+    parity_contexts: usize,
     mut progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     let mut match_finder = MatchFinder::new(data);
     let mut rans_coder = RansCoder::new(use_bitstream);
-    let mut state = lz::CoderState::new();
+    let mut state = lz::CoderState::new(parity_contexts);
 
     let mut pos = 0;
     while pos < data.len() {
