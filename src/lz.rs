@@ -106,9 +106,9 @@ impl CoderState {
     }
 }
 
-pub fn unpack(packed_data: &[u8], use_bitstream: bool, parity_contexts: usize) -> Vec<u8> {
-    let mut decoder = RansDecoder::new(packed_data, use_bitstream);
-    let mut contexts = ContextState::new((1 + 255) * parity_contexts + 1 + 64 + 64);
+pub fn unpack(packed_data: &[u8], config: crate::Config) -> Vec<u8> {
+    let mut decoder = RansDecoder::new(packed_data, config.use_bitstream);
+    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64);
     let mut result = vec![];
     let mut offset = 0;
     let mut prev_was_match = false;
@@ -131,17 +131,26 @@ pub fn unpack(packed_data: &[u8], use_bitstream: bool, parity_contexts: usize) -
     }
 
     loop {
-        let literal_base = result.len() % parity_contexts * 256;
+        let literal_base = result.len() % config.parity_contexts * 256;
         if decoder.decode_with_context(&mut contexts.context_mut(literal_base)) {
             if prev_was_match
-                || decoder.decode_with_context(&mut contexts.context_mut(256 * parity_contexts))
+                || decoder
+                    .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))
             {
-                offset = decode_length(&mut decoder, &mut contexts, 256 * parity_contexts + 1) - 1;
+                offset = decode_length(
+                    &mut decoder,
+                    &mut contexts,
+                    256 * config.parity_contexts + 1,
+                ) - 1;
                 if offset == 0 {
                     break;
                 }
             }
-            let length = decode_length(&mut decoder, &mut contexts, 256 * parity_contexts + 65);
+            let length = decode_length(
+                &mut decoder,
+                &mut contexts,
+                256 * config.parity_contexts + 65,
+            );
             for _ in 0..length {
                 result.push(result[result.len() - offset]);
             }

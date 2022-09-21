@@ -9,21 +9,39 @@ pub use lz::unpack;
 
 pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);
 
+pub struct Config {
+    pub use_bitstream: bool,
+    pub parity_contexts: usize,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            use_bitstream: false,
+            parity_contexts: 1,
+        }
+    }
+}
+
 pub fn pack(
     data: &[u8],
     level: u8,
-    use_bitstream: bool,
-    parity_contexts: usize,
+    config: Config,
     progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     if level == 0 {
-        greedy_packer::pack(data, use_bitstream, parity_contexts, progress_callback)
+        greedy_packer::pack(
+            data,
+            config.use_bitstream,
+            config.parity_contexts,
+            progress_callback,
+        )
     } else {
         parsing_packer::pack(
             data,
             level,
-            use_bitstream,
-            parity_contexts,
+            config.use_bitstream,
+            config.parity_contexts,
             progress_callback,
         )
     }
