@@ -19,6 +19,11 @@ fn main() -> Result<()> {
             Short('b') | Long("bitstream") => config.use_bitstream = true,
             Short('p') | Long("parity") => config.parity_contexts = parser.value()?.parse()?,
             Short('r') | Long("reverse") => reverse = true,
+            Long("invert-is-match-bit") => config.is_match_bit = false,
+            Long("invert-new-offset-bit") => config.new_offset_bit = false,
+            Long("invert-continue-value-bit") => config.continue_value_bit = false,
+            Long("invert-probs") => config.invert_probs = true,
+
             Short('u') | Long("unpack") => unpack = true,
             Short('l') | Long("level") => level = parser.value()?.parse()?,
             Short('h') | Long("help") => print_help(0),
@@ -111,5 +116,11 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" -b, --bitstream     bitstream mode");
     eprintln!(" -p, --parity N      use N (2/4) parity contexts");
     eprintln!(" -r, --reverse       reverse input & output");
+    eprintln!();
+    eprintln!("Config options to tailor output to specific optimized unpackers:");
+    eprintln!(" --invert-is-match-bit");
+    eprintln!(" --invert-new-offset-bit");
+    eprintln!(" --invert-continue-value-bit");
+    eprintln!(" --invert-probs");
     process::exit(exit_code);
 }

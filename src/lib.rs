@@ -12,6 +12,11 @@ pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);
 pub struct Config {
     pub use_bitstream: bool,
     pub parity_contexts: usize,
+
+    pub invert_probs: bool,
+    pub is_match_bit: bool,
+    pub new_offset_bit: bool,
+    pub continue_value_bit: bool,
 }
 
 impl Default for Config {
@@ -19,6 +24,11 @@ impl Default for Config {
         Config {
             use_bitstream: false,
             parity_contexts: 1,
+
+            invert_probs: false,
+            is_match_bit: true,
+            new_offset_bit: true,
+            continue_value_bit: true,
         }
     }
 }
@@ -30,20 +40,9 @@ pub fn pack(
     progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     if level == 0 {
-        greedy_packer::pack(
-            data,
-            config.use_bitstream,
-            config.parity_contexts,
-            progress_callback,
-        )
+        greedy_packer::pack(data, &config, progress_callback)
     } else {
-        parsing_packer::pack(
-            data,
-            level,
-            config.use_bitstream,
-            config.parity_contexts,
-            progress_callback,
-        )
+        parsing_packer::pack(data, level, &config, progress_callback)
     }
 }
 

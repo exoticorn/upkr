@@ -1,5 +1,6 @@
 use crate::context_state::ContextState;
 use crate::rans::{EntropyCoder, RansDecoder};
+use crate::Config;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Op {
@@ -8,11 +9,11 @@ pub enum Op {
 }
 
 impl Op {
-    pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState) {
+    pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
         let literal_base = state.pos % state.parity_contexts * 256;
         match self {
             &Op::Literal(lit) => {
-                encode_bit(coder, state, literal_base, false);
+                encode_bit(coder, state, literal_base, !config.is_match_bit);
                 let mut context_index = 1;
                 for i in (0..8).rev() {
                     let bit = (lit >> i) & 1 != 0;
@@ -23,22 +24,28 @@ impl Op {
                 state.pos += 1;
             }
             &Op::Match { offset, len } => {
-                encode_bit(coder, state, literal_base, true);
+                encode_bit(coder, state, literal_base, config.is_match_bit);
                 if !state.prev_was_match {
                     encode_bit(
                         coder,
                         state,
                         256 * state.parity_contexts,
-                        offset != state.last_offset,
+                        (offset != state.last_offset) == config.new_offset_bit,
                     );
                 } else {
                     assert!(offset != state.last_offset);
                 }
                 if offset != state.last_offset {
-                    encode_length(coder, state, 256 * state.parity_contexts + 1, offset + 1);
+                    encode_length(
+                        coder,
+                        state,
+                        256 * state.parity_contexts + 1,
+                        offset + 1,
+                        config,
+                    );
                     state.last_offset = offset;
                 }
-                encode_length(coder, state, 256 * state.parity_contexts + 65, len);
+                encode_length(coder, state, 256 * state.parity_contexts + 65, len, config);
                 state.prev_was_match = true;
                 state.pos += len as usize;
             }
@@ -46,12 +53,22 @@ impl Op {
     }
 }
 
-pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState) {
-    encode_bit(coder, state, state.pos % state.parity_contexts * 256, true);
+pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
+    encode_bit(
+        coder,
+        state,
+        state.pos % state.parity_contexts * 256,
+        config.is_match_bit,
+    );
     if !state.prev_was_match {
-        encode_bit(coder, state, 256 * state.parity_contexts, true);
+        encode_bit(
+            coder,
+            state,
+            256 * state.parity_contexts,
+            config.new_offset_bit,
+        );
     }
-    encode_length(coder, state, 256 * state.parity_contexts + 1, 1);
+    encode_length(coder, state, 256 * state.parity_contexts + 1, 1, config);
 }
 
 fn encode_bit(
@@ -68,17 +85,18 @@ fn encode_length(
     state: &mut CoderState,
     context_start: usize,
     mut value: u32,
+    config: &Config,
 ) {
     assert!(value >= 1);
 
     let mut context_index = context_start;
     while value >= 2 {
-        encode_bit(coder, state, context_index, true);
+        encode_bit(coder, state, context_index, config.continue_value_bit);
         encode_bit(coder, state, context_index + 1, value & 1 != 0);
         context_index += 2;
         value >>= 1;
     }
-    encode_bit(coder, state, context_index, false);
+    encode_bit(coder, state, context_index, !config.continue_value_bit);
 }
 
 #[derive(Clone)]
@@ -106,7 +124,7 @@ impl CoderState {
     }
 }
 
-pub fn unpack(packed_data: &[u8], config: crate::Config) -> Vec<u8> {
+pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
     let mut decoder = RansDecoder::new(packed_data, config.use_bitstream);
     let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64);
     let mut result = vec![];
@@ -117,10 +135,13 @@ pub fn unpack(packed_data: &[u8], config: crate::Config) -> Vec<u8> {
         decoder: &mut RansDecoder,
         contexts: &mut ContextState,
         mut context_index: usize,
+        config: &Config,
     ) -> usize {
         let mut length = 0;
         let mut bit_pos = 0;
-        while decoder.decode_with_context(&mut contexts.context_mut(context_index)) {
+        while decoder.decode_with_context(&mut contexts.context_mut(context_index))
+            == config.continue_value_bit
+        {
             length |= (decoder.decode_with_context(&mut contexts.context_mut(context_index + 1))
                 as usize)
                 << bit_pos;
@@ -132,15 +153,19 @@ pub fn unpack(packed_data: &[u8], config: crate::Config) -> Vec<u8> {
 
     loop {
         let literal_base = result.len() % config.parity_contexts * 256;
-        if decoder.decode_with_context(&mut contexts.context_mut(literal_base)) {
+        if decoder.decode_with_context(&mut contexts.context_mut(literal_base))
+            == config.is_match_bit
+        {
             if prev_was_match
                 || decoder
                     .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))
+                    == config.new_offset_bit
             {
                 offset = decode_length(
                     &mut decoder,
                     &mut contexts,
                     256 * config.parity_contexts + 1,
+                    &config,
                 ) - 1;
                 if offset == 0 {
                     break;
@@ -150,6 +175,7 @@ pub fn unpack(packed_data: &[u8], config: crate::Config) -> Vec<u8> {
                 &mut decoder,
                 &mut contexts,
                 256 * config.parity_contexts + 65,
+                &config,
             );
             for _ in 0..length {
                 result.push(result[result.len() - offset]);

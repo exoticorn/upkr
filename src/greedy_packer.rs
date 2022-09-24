@@ -1,17 +1,16 @@
-use crate::lz;
 use crate::match_finder::MatchFinder;
 use crate::rans::RansCoder;
 use crate::ProgressCallback;
+use crate::{lz, Config};
 
 pub fn pack(
     data: &[u8],
-    use_bitstream: bool,
-    parity_contexts: usize,
+    config: &Config,
     mut progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     let mut match_finder = MatchFinder::new(data);
-    let mut rans_coder = RansCoder::new(use_bitstream);
-    let mut state = lz::CoderState::new(parity_contexts);
+    let mut rans_coder = RansCoder::new(config.use_bitstream);
+    let mut state = lz::CoderState::new(config.parity_contexts);
 
     let mut pos = 0;
     while pos < data.len() {
@@ -27,7 +26,7 @@ pub fn pack(
                     offset: offset as u32,
                     len: m.length as u32,
                 }
-                .encode(&mut rans_coder, &mut state);
+                .encode(&mut rans_coder, &mut state, config);
                 pos += m.length;
                 encoded_match = true;
             }
@@ -46,7 +45,7 @@ pub fn pack(
                         offset: offset as u32,
                         len: length as u32,
                     }
-                    .encode(&mut rans_coder, &mut state);
+                    .encode(&mut rans_coder, &mut state, config);
                     pos += length;
                     encoded_match = true;
                 }
@@ -54,11 +53,11 @@ pub fn pack(
         }
 
         if !encoded_match {
-            lz::Op::Literal(data[pos]).encode(&mut rans_coder, &mut state);
+            lz::Op::Literal(data[pos]).encode(&mut rans_coder, &mut state, config);
             pos += 1;
         }
     }
 
-    lz::encode_eof(&mut rans_coder, &mut state);
+    lz::encode_eof(&mut rans_coder, &mut state, config);
     rans_coder.finish()
 }

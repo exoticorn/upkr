@@ -9,27 +9,21 @@ use crate::{lz, ProgressCallback};
 pub fn pack(
     data: &[u8],
     level: u8,
-    use_bitstream: bool,
-    parity_contexts: usize,
+    config: &crate::Config,
     progress_cb: Option<ProgressCallback>,
 ) -> Vec<u8> {
-    let mut parse = parse(
-        data,
-        Config::from_level(level),
-        parity_contexts,
-        progress_cb,
-    );
+    let mut parse = parse(data, Config::from_level(level), config, progress_cb);
     let mut ops = vec![];
     while let Some(link) = parse {
         ops.push(link.op);
         parse = link.prev.clone();
     }
-    let mut state = lz::CoderState::new(parity_contexts);
-    let mut coder = RansCoder::new(use_bitstream);
+    let mut state = lz::CoderState::new(config.parity_contexts);
+    let mut coder = RansCoder::new(config.use_bitstream);
     for op in ops.into_iter().rev() {
-        op.encode(&mut coder, &mut state);
+        op.encode(&mut coder, &mut state, config);
     }
-    lz::encode_eof(&mut coder, &mut state);
+    lz::encode_eof(&mut coder, &mut state, config);
     coder.finish()
 }
 
@@ -49,7 +43,7 @@ type Arrivals = HashMap<usize, Vec<Arrival>>;
 fn parse(
     data: &[u8],
     config: Config,
-    parity_contexts: usize,
+    encoding_config: &crate::Config,
     mut progress_cb: Option<ProgressCallback>,
 ) -> Option<Rc<Parse>> {
     let mut match_finder = MatchFinder::new(data)
@@ -114,6 +108,7 @@ fn parse(
         length: usize,
         arrival: &Arrival,
         max_arrivals: usize,
+        config: &crate::Config,
     ) {
         cost_counter.reset();
         let mut state = arrival.state.clone();
@@ -121,7 +116,7 @@ fn parse(
             offset: offset as u32,
             len: length as u32,
         };
-        op.encode(cost_counter, &mut state);
+        op.encode(cost_counter, &mut state, config);
         add_arrival(
             arrivals,
             pos + length,
@@ -141,7 +136,7 @@ fn parse(
         0,
         Arrival {
             parse: None,
-            state: lz::CoderState::new(parity_contexts),
+            state: lz::CoderState::new(encoding_config.parity_contexts),
             cost: 0.0,
         },
         max_arrivals,
@@ -197,6 +192,7 @@ fn parse(
                     m.length,
                     &arrival,
                     max_arrivals,
+                    encoding_config,
                 );
                 if m.length >= config.greedy_size {
                     break 'arrival_loop;
@@ -220,6 +216,7 @@ fn parse(
                     length,
                     &arrival,
                     max_arrivals,
+                    encoding_config,
                 );
                 found_last_offset |= offset as u32 == arrival.state.last_offset();
                 if offset < near_matches.len() {
@@ -240,6 +237,7 @@ fn parse(
                         length,
                         &arrival,
                         max_arrivals,
+                        encoding_config,
                     );
                 }
             }
@@ -247,7 +245,7 @@ fn parse(
             cost_counter.reset();
             let mut state = arrival.state;
             let op = lz::Op::Literal(data[pos]);
-            op.encode(cost_counter, &mut state);
+            op.encode(cost_counter, &mut state, encoding_config);
             add_arrival(
                 &mut arrivals,
                 pos + 1,
