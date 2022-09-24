@@ -18,8 +18,8 @@ pub fn pack(
         ops.push(link.op);
         parse = link.prev.clone();
     }
-    let mut state = lz::CoderState::new(config.parity_contexts);
-    let mut coder = RansCoder::new(config.use_bitstream);
+    let mut state = lz::CoderState::new(config);
+    let mut coder = RansCoder::new(config);
     for op in ops.into_iter().rev() {
         op.encode(&mut coder, &mut state, config);
     }
@@ -136,13 +136,13 @@ fn parse(
         0,
         Arrival {
             parse: None,
-            state: lz::CoderState::new(encoding_config.parity_contexts),
+            state: lz::CoderState::new(encoding_config),
             cost: 0.0,
         },
         max_arrivals,
     );
 
-    let cost_counter = &mut CostCounter::new();
+    let cost_counter = &mut CostCounter::new(encoding_config);
     let mut best_per_offset = HashMap::new();
     for pos in 0..data.len() {
         let match_length = |offset: usize| {

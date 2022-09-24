@@ -9,8 +9,8 @@ pub fn pack(
     mut progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     let mut match_finder = MatchFinder::new(data);
-    let mut rans_coder = RansCoder::new(config.use_bitstream);
-    let mut state = lz::CoderState::new(config.parity_contexts);
+    let mut rans_coder = RansCoder::new(config);
+    let mut state = lz::CoderState::new(config);
 
     let mut pos = 0;
     while pos < data.len() {

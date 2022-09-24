@@ -22,7 +22,24 @@ fn main() -> Result<()> {
             Long("invert-is-match-bit") => config.is_match_bit = false,
             Long("invert-new-offset-bit") => config.new_offset_bit = false,
             Long("invert-continue-value-bit") => config.continue_value_bit = false,
-            Long("invert-probs") => config.invert_probs = true,
+            Long("invert-bit-encoding") => config.invert_bit_encoding = true,
+            Long("simplified-prob-update") => config.simplified_prob_update = true,
+            Long("big-endian-bitstream") => {
+                config.use_bitstream = true;
+                config.bitstream_is_big_endian = true;
+            }
+
+            Long("z80") => {
+                config.use_bitstream = true;
+                config.bitstream_is_big_endian = true;
+                config.invert_bit_encoding = true;
+                config.simplified_prob_update = true;
+            }
+            Long("x86") => {
+                config.use_bitstream = true;
+                config.continue_value_bit = false;
+                config.is_match_bit = false;
+            }
 
             Short('u') | Long("unpack") => unpack = true,
             Short('l') | Long("level") => level = parser.value()?.parse()?,
@@ -112,6 +129,10 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" -l, --level N       compression level 0-9");
     eprintln!(" -u, --unpack        unpack infile");
     eprintln!();
+    eprintln!("Config presets for specific unpackers:");
+    eprintln!(" --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update");
+    eprintln!(" --x86               --bitstream --invert-is-match-bit --invert-continue-value-bit");
+    eprintln!();
     eprintln!("Config options (need to match when packing/unpacking):");
     eprintln!(" -b, --bitstream     bitstream mode");
     eprintln!(" -p, --parity N      use N (2/4) parity contexts");
@@ -121,6 +142,8 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" --invert-is-match-bit");
     eprintln!(" --invert-new-offset-bit");
     eprintln!(" --invert-continue-value-bit");
-    eprintln!(" --invert-probs");
+    eprintln!(" --invert-bit-encoding");
+    eprintln!(" --simplified-prob-update");
+    eprintln!(" --big-endian-bitstream   (implies --bitstream)");
     process::exit(exit_code);
 }

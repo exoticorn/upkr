@@ -13,10 +13,13 @@ pub struct Config {
     pub use_bitstream: bool,
     pub parity_contexts: usize,
 
-    pub invert_probs: bool,
+    pub invert_bit_encoding: bool,
     pub is_match_bit: bool,
     pub new_offset_bit: bool,
     pub continue_value_bit: bool,
+
+    pub bitstream_is_big_endian: bool,
+    pub simplified_prob_update: bool,
 }
 
 impl Default for Config {
@@ -25,10 +28,13 @@ impl Default for Config {
             use_bitstream: false,
             parity_contexts: 1,
 
-            invert_probs: false,
+            invert_bit_encoding: false,
             is_match_bit: true,
             new_offset_bit: true,
             continue_value_bit: true,
+
+            bitstream_is_big_endian: false,
+            simplified_prob_update: false,
         }
     }
 }

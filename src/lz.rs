@@ -102,20 +102,20 @@ fn encode_length(
 #[derive(Clone)]
 pub struct CoderState {
     contexts: ContextState,
-    parity_contexts: usize,
     last_offset: u32,
     prev_was_match: bool,
     pos: usize,
+    parity_contexts: usize,
 }
 
 impl CoderState {
-    pub fn new(parity_contexts: usize) -> CoderState {
+    pub fn new(config: &Config) -> CoderState {
         CoderState {
-            contexts: ContextState::new((1 + 255) * parity_contexts + 1 + 64 + 64),
+            contexts: ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, config),
             last_offset: 0,
-            parity_contexts,
             prev_was_match: false,
             pos: 0,
+            parity_contexts: config.parity_contexts,
         }
     }
 
@@ -125,8 +125,8 @@ impl CoderState {
 }
 
 pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
-    let mut decoder = RansDecoder::new(packed_data, config.use_bitstream);
-    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64);
+    let mut decoder = RansDecoder::new(packed_data, &config);
+    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, &config);
     let mut result = vec![];
     let mut offset = 0;
     let mut prev_was_match = false;
