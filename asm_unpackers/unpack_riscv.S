@@ -1,6 +1,6 @@
 .section .text
 
-#define FRAME_SIZE (256+64*4+4)
+#define FRAME_SIZE (256+32*4+4)
 
 // x8 prob array ptr
 // x9 prev was literal
@@ -28,39 +28,39 @@ upkr_unpack:
 	jal upkr_decode_bit
 	beqz x15, .Lliteral
 	
-	li x14, 256
-	beqz x9, .Lread_offset
+	slli x14, x14, 8
+	beqz x9, .Lread_offset_inc_x14
 	jal upkr_decode_bit
-	beqz x15, .Lskip_offset
-.Lread_offset:
-	jal t3, upkr_decode_number
-	addi x12, x9, -1
-	beqz x12, .Ldone
+	bnez x15, .Lread_offset
 
-.Lskip_offset:
-	li x14, 256+64
+.Lfinished_offset:
+	addi x14, x14, 64
 	jal t3, upkr_decode_number
 1:
-	sub x15, x10, x12
-	lbu x15, (x15)
-	sb x15, (x10)
+	add x14, x10, t0
+	lbu x14, (x14)
+.Lstore_byte:
+	sb x14, (x10)
 	addi x10, x10, 1
-	addi x9, x9, -1
-	bnez x9, 1b
+	addi x9, x9, 1
+	blt x9, x0, 1b
 	j .Lmainloop
 	
 .Lliteral:
-	li x14, 1
-1:
 	jal upkr_decode_bit
+	addi x14, x14, -1
 	slli x14, x14, 1
 	add x14, x14, x15
 	srli x9, x14, 8
-	beqz x9, 1b
-	sb x14, 0(x10)
-	addi x10, x10, 1
-	j .Lmainloop
+	beqz x9, .Lliteral
+	j .Lstore_byte
 
+.Lread_offset_inc_x14:
+	addi x14, x14, 1
+.Lread_offset:
+	jal t3, upkr_decode_number
+	addi t0, x9, 1
+	bnez t0, .Lfinished_offset
 .Ldone:
 	addi sp, sp, FRAME_SIZE
 	mv x8, x17
@@ -68,16 +68,14 @@ upkr_unpack:
 	jr t4
 
 // x14 context index
-// return: x9 decoded number 
+// return: x9 negtive decoded number 
 upkr_decode_number:
 	mv t5, x14
 	li x9, 0
-	li x8, 1
+	li x8, -1
 1:
-	addi x14, x14, 1
 	jal upkr_decode_bit
 	beqz x15, 1f
-	addi x14, x14, 1
 	jal upkr_decode_bit
 	beqz x15, 2f
 	add x9, x9, x8
@@ -99,46 +97,46 @@ upkr_load_byte:
 // x11 in ptr
 // x13 state
 // x14 context index
-// return: x15 decoded bit
+// return:
+//   x14 context index + 1
+//   x15 decoded bit
 upkr_decode_bit:
 	srli x15, x13, 12
 	beqz x15, upkr_load_byte
 
-	mv t0, x9
 	mv t1, x14
 	mv t2, x10
 	
 	add x14, x14, sp
-	lbu x9, 0(x14)
+	lbu x12, 0(x14)
 	
 	andi x10, x13, 255
-	sltu x15, x10, x9
+	sltu x15, x10, x12
 	srli x13, x13, 8
 	beqz x15, .Lelse
 	
-	mul x13, x13, x9
+	mul x13, x13, x12
 	add x13, x13, x10
 	li x10, 256 + 8
-	sub x10, x10, x9
+	sub x10, x10, x12
 	srli x10, x10, 4
-	add x9, x9, x10
+	add x12, x12, x10
 	j .Lendif
 
 .Lelse:
 	li x16, 256
-	sub x16, x16, x9
+	sub x16, x16, x12
 	mul x13, x13, x16
 	add x13, x13, x10
-	sub x13, x13, x9
-	addi x10, x9, 8
+	sub x13, x13, x12
+	addi x10, x12, 8
 	srli x10, x10, 4
-	sub x9, x9, x10
+	sub x12, x12, x10
 
 .Lendif:
 
-	sb x9, 0(x14)
+	sb x12, 0(x14)
 	
-	mv x9, t0
-	mv x14, t1
+	addi x14, t1, 1
 	mv x10, t2
 	ret

@@ -6,10 +6,25 @@ test_riscv64: build/unpack_riscv64
 	qemu-riscv64 $< test_data.upk /tmp/out.bin
 	cmp test_data.bin /tmp/out.bin
 
-build/unpack_riscv64.bin: unpack_riscv.S
+build/unpack_riscv64.o: unpack_riscv.S
 	mkdir -p build
-	riscv64-linux-gnu-gcc -c -o build/unpack_riscv64.o $?
-	riscv64-linux-gnu-objcopy -O binary --only-section=.text build/unpack_riscv64.o $@
+	riscv64-linux-gnu-gcc -c -o $@ $?
+
+build/unpack_riscv64.bin: build/unpack_riscv64.o
+	riscv64-linux-gnu-objcopy -O binary --only-section=.text $? $@
+
+disas-riscv64: build/unpack_riscv64.o
+	riscv64-linux-gnu-objdump -d $?
+
+build/unpack_riscv32.o: unpack_riscv.S
+	mkdir -p build
+	riscv64-linux-gnu-gcc -march=rv32imc -mabi=ilp32 -c -o $@ $?
+	
+build/unpack_riscv32.bin: build/unpack_riscv32.o
+	riscv64-linux-gnu-objcopy -O binary --only-section=.text $? $@
+
+disas-riscv32: build/unpack_riscv32.o
+	riscv64-linux-gnu-objdump -d $?
 
 build/unpack_armv6m: ../c_unpacker/main.c unpack_armv6m.S
 	mkdir -p build
@@ -32,5 +47,5 @@ test_c: build/unpack_c
 	$< test_data.upk /tmp/out.bin
 	cmp test_data.bin /tmp/out.bin
 
-sizes: build/unpack_armv6m.bin build/unpack_riscv64.bin
+sizes: build/unpack_armv6m.bin build/unpack_riscv64.bin build/unpack_riscv32.bin
 	ls -l build/*.bin
