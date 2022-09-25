@@ -5,7 +5,7 @@ mod match_finder;
 mod parsing_packer;
 mod rans;
 
-pub use lz::unpack;
+pub use lz::{calculate_margin, unpack};
 
 pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);
 

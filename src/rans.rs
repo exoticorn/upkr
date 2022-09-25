@@ -149,6 +149,7 @@ impl EntropyCoder for CostCounter {
 
 pub struct RansDecoder<'a> {
     data: &'a [u8],
+    pos: usize,
     state: u32,
     use_bitstream: bool,
     byte: u8,
@@ -163,6 +164,7 @@ impl<'a> RansDecoder<'a> {
     pub fn new(data: &'a [u8], config: &Config) -> RansDecoder<'a> {
         RansDecoder {
             data,
+            pos: 0,
             state: 0,
             use_bitstream: config.use_bitstream,
             byte: 0,
@@ -170,6 +172,10 @@ impl<'a> RansDecoder<'a> {
             invert_bit_encoding: config.invert_bit_encoding,
             bitstream_is_big_endian: config.bitstream_is_big_endian,
         }
+    }
+
+    pub fn pos(&self) -> usize {
+        self.pos
     }
 
     pub fn decode_with_context(&mut self, context: &mut Context) -> bool {
@@ -183,8 +189,8 @@ impl<'a> RansDecoder<'a> {
         if self.use_bitstream {
             while self.state < 32768 {
                 if self.bits_left == 0 {
-                    self.byte = self.data[0];
-                    self.data = &self.data[1..];
+                    self.byte = self.data[self.pos];
+                    self.pos += 1;
                     self.bits_left = 8;
                 }
                 if self.bitstream_is_big_endian {

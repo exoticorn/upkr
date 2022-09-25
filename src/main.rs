@@ -8,6 +8,7 @@ fn main() -> Result<()> {
     let mut config = upkr::Config::default();
     let mut reverse = false;
     let mut unpack = false;
+    let mut calculate_margin = false;
     let mut level = 2;
     let mut infile: Option<PathBuf> = None;
     let mut outfile: Option<PathBuf> = None;
@@ -43,6 +44,7 @@ fn main() -> Result<()> {
             }
 
             Short('u') | Long("unpack") => unpack = true,
+            Long("margin") => calculate_margin = true,
             Short('l') | Long("level") => level = parser.value()?.parse()?,
             Short('h') | Long("help") => print_help(0),
             Value(val) if infile.is_none() => infile = Some(val.try_into()?),
@@ -76,7 +78,7 @@ fn main() -> Result<()> {
         process::exit(1);
     }
 
-    if !unpack {
+    if !unpack && !calculate_margin {
         let mut data = vec![];
         File::open(infile)?.read_to_end(&mut data)?;
         if reverse {
@@ -112,11 +114,16 @@ fn main() -> Result<()> {
         if reverse {
             data.reverse();
         }
-        let mut unpacked_data = upkr::unpack(&data, config);
-        if reverse {
-            unpacked_data.reverse();
+        if unpack {
+            let mut unpacked_data = upkr::unpack(&data, &config);
+            if reverse {
+                unpacked_data.reverse();
+            }
+            File::create(outfile)?.write_all(&unpacked_data)?;
         }
-        File::create(outfile)?.write_all(&unpacked_data)?;
+        if calculate_margin {
+            println!("{}", upkr::calculate_margin(&data, &config));
+        }
     }
 
     Ok(())
@@ -126,9 +133,11 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!("Usage:");
     eprintln!("  upkr [-l level(0-9)] [config options] <infile> [<outfile>]");
     eprintln!("  upkr -u [config options] <infile> [<outfile>]");
+    eprintln!("  upkr --margin [config options] <infile>");
     eprintln!();
     eprintln!(" -l, --level N       compression level 0-9");
     eprintln!(" -u, --unpack        unpack infile");
+    eprintln!(" --margin            calculate margin for overlapped unpacking of a packed file");
     eprintln!();
     eprintln!("Config presets for specific unpackers:");
     eprintln!(" --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update");

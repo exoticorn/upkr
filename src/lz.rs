@@ -124,12 +124,27 @@ impl CoderState {
     }
 }
 
-pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
+pub fn unpack(packed_data: &[u8], config: &Config) -> Vec<u8> {
+    let mut result = vec![];
+    let _ = unpack_internal(Some(&mut result), packed_data, config);
+    result
+}
+
+pub fn calculate_margin(packed_data: &[u8], config: &Config) -> isize {
+    unpack_internal(None, packed_data, config)
+}
+
+pub fn unpack_internal(
+    mut result: Option<&mut Vec<u8>>,
+    packed_data: &[u8],
+    config: &Config,
+) -> isize {
     let mut decoder = RansDecoder::new(packed_data, &config);
     let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, &config);
-    let mut result = vec![];
     let mut offset = 0;
+    let mut position = 0usize;
     let mut prev_was_match = false;
+    let mut margin = 0isize;
 
     fn decode_length(
         decoder: &mut RansDecoder,
@@ -152,7 +167,8 @@ pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
     }
 
     loop {
-        let literal_base = result.len() % config.parity_contexts * 256;
+        margin = margin.max(position as isize - decoder.pos() as isize);
+        let literal_base = position % config.parity_contexts * 256;
         if decoder.decode_with_context(&mut contexts.context_mut(literal_base))
             == config.is_match_bit
         {
@@ -178,9 +194,12 @@ pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
                 256 * config.parity_contexts + 65,
                 &config,
             );
-            for _ in 0..length {
-                result.push(result[result.len() - offset]);
+            if let Some(ref mut result) = result {
+                for _ in 0..length {
+                    result.push(result[result.len() - offset]);
+                }
             }
+            position += length;
             prev_was_match = true;
         } else {
             let mut context_index = 1;
@@ -191,10 +210,13 @@ pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
                 context_index = (context_index << 1) | bit as usize;
                 byte |= (bit as u8) << i;
             }
-            result.push(byte);
+            if let Some(ref mut result) = result {
+                result.push(byte);
+            }
+            position += 1;
             prev_was_match = false;
         }
     }
 
-    result
+    margin + decoder.pos() as isize - position as isize
 }
