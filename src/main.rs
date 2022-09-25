@@ -146,5 +146,6 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" --invert-bit-encoding");
     eprintln!(" --simplified-prob-update");
     eprintln!(" --big-endian-bitstream   (implies --bitstream)");
+    eprintln!(" --no-repeated-offsets");
     process::exit(exit_code);
 }
