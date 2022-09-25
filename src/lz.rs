@@ -25,7 +25,7 @@ impl Op {
             }
             &Op::Match { offset, len } => {
                 encode_bit(coder, state, literal_base, config.is_match_bit);
-                if !state.prev_was_match {
+                if !state.prev_was_match && !config.no_repeated_offsets {
                     encode_bit(
                         coder,
                         state,
@@ -33,9 +33,9 @@ impl Op {
                         (offset != state.last_offset) == config.new_offset_bit,
                     );
                 } else {
-                    assert!(offset != state.last_offset);
+                    assert!(offset != state.last_offset || config.no_repeated_offsets);
                 }
-                if offset != state.last_offset {
+                if offset != state.last_offset || config.no_repeated_offsets {
                     encode_length(
                         coder,
                         state,
@@ -156,7 +156,8 @@ pub fn unpack(packed_data: &[u8], config: Config) -> Vec<u8> {
         if decoder.decode_with_context(&mut contexts.context_mut(literal_base))
             == config.is_match_bit
         {
-            if prev_was_match
+            if config.no_repeated_offsets
+                || prev_was_match
                 || decoder
                     .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))
                     == config.new_offset_bit

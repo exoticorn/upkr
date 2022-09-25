@@ -28,6 +28,7 @@ fn main() -> Result<()> {
                 config.use_bitstream = true;
                 config.bitstream_is_big_endian = true;
             }
+            Long("no-repeated-offsets") => config.no_repeated_offsets = true,
 
             Long("z80") => {
                 config.use_bitstream = true;

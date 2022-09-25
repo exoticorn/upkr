@@ -20,6 +20,8 @@ pub struct Config {
 
     pub bitstream_is_big_endian: bool,
     pub simplified_prob_update: bool,
+
+    pub no_repeated_offsets: bool,
 }
 
 impl Default for Config {
@@ -35,6 +37,8 @@ impl Default for Config {
 
             bitstream_is_big_endian: false,
             simplified_prob_update: false,
+
+            no_repeated_offsets: false,
         }
     }
 }
