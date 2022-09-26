@@ -21,7 +21,7 @@ pub fn pack(
         if let Some(m) = match_finder.matches(pos).next() {
             let max_offset = 1 << (m.length * 3 - 1).min(31);
             let offset = pos - m.pos;
-            if offset < max_offset {
+            if offset < max_offset && m.length >= config.min_length() {
                 lz::Op::Match {
                     offset: offset as u32,
                     len: m.length as u32,
@@ -40,7 +40,7 @@ pub fn pack(
                     .zip(data[(pos - offset)..].iter())
                     .take_while(|(a, b)| a == b)
                     .count();
-                if length > 0 {
+                if length >= config.min_length() {
                     lz::Op::Match {
                         offset: offset as u32,
                         len: length as u32,

@@ -110,6 +110,9 @@ fn parse(
         max_arrivals: usize,
         config: &crate::Config,
     ) {
+        if length < config.min_length() {
+            return;
+        }
         cost_counter.reset();
         let mut state = arrival.state.clone();
         let op = lz::Op::Match {

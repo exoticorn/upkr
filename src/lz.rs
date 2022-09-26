@@ -40,11 +40,12 @@ impl Op {
                         coder,
                         state,
                         256 * state.parity_contexts + 1,
-                        offset + 1,
+                        offset + if config.eof_in_length { 0 } else { 1 },
                         config,
                     );
                     state.last_offset = offset;
                 }
+                assert!(!config.eof_in_length || len > 1);
                 encode_length(coder, state, 256 * state.parity_contexts + 65, len, config);
                 state.prev_was_match = true;
                 state.pos += len as usize;
@@ -60,15 +61,20 @@ pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState, config: 
         state.pos % state.parity_contexts * 256,
         config.is_match_bit,
     );
-    if !state.prev_was_match {
+    if !state.prev_was_match && !config.no_repeated_offsets {
         encode_bit(
             coder,
             state,
             256 * state.parity_contexts,
-            config.new_offset_bit,
+            config.new_offset_bit ^ config.eof_in_length,
         );
     }
-    encode_length(coder, state, 256 * state.parity_contexts + 1, 1, config);
+    if !config.eof_in_length || config.no_repeated_offsets {
+        encode_length(coder, state, 256 * state.parity_contexts + 1, 1, config);
+    }
+    if config.eof_in_length {
+        encode_length(coder, state, 256 * state.parity_contexts + 65, 1, config);
+    }
 }
 
 fn encode_bit(
@@ -183,7 +189,7 @@ pub fn unpack_internal(
                     &mut contexts,
                     256 * config.parity_contexts + 1,
                     &config,
-                ) - 1;
+                ) - if config.eof_in_length { 0 } else { 1 };
                 if offset == 0 {
                     break;
                 }
@@ -194,6 +200,9 @@ pub fn unpack_internal(
                 256 * config.parity_contexts + 65,
                 &config,
             );
+            if config.eof_in_length && length == 1 {
+                break;
+            }
             if let Some(ref mut result) = result {
                 for _ in 0..length {
                     result.push(result[result.len() - offset]);

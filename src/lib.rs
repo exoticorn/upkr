@@ -22,6 +22,7 @@ pub struct Config {
     pub simplified_prob_update: bool,
 
     pub no_repeated_offsets: bool,
+    pub eof_in_length: bool,
 }
 
 impl Default for Config {
@@ -39,6 +40,17 @@ impl Default for Config {
             simplified_prob_update: false,
 
             no_repeated_offsets: false,
+            eof_in_length: false,
+        }
+    }
+}
+
+impl Config {
+    pub fn min_length(&self) -> usize {
+        if self.eof_in_length {
+            2
+        } else {
+            1
         }
     }
 }

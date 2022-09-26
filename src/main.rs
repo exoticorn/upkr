@@ -30,12 +30,14 @@ fn main() -> Result<()> {
                 config.bitstream_is_big_endian = true;
             }
             Long("no-repeated-offsets") => config.no_repeated_offsets = true,
+            Long("eof-in-length") => config.eof_in_length = true,
 
             Long("z80") => {
                 config.use_bitstream = true;
                 config.bitstream_is_big_endian = true;
                 config.invert_bit_encoding = true;
                 config.simplified_prob_update = true;
+                level = 9;
             }
             Long("x86") => {
                 config.use_bitstream = true;
