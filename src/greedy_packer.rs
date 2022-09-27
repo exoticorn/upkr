@@ -19,15 +19,16 @@ pub fn pack(
         }
         let mut encoded_match = false;
         if let Some(m) = match_finder.matches(pos).next() {
-            let max_offset = 1 << (m.length * 3 - 1).min(31);
+            let max_offset = config.max_offset.min(1 << (m.length * 3 - 1).min(31));
             let offset = pos - m.pos;
             if offset < max_offset && m.length >= config.min_length() {
+                let length = m.length.min(config.max_length);
                 lz::Op::Match {
                     offset: offset as u32,
-                    len: m.length as u32,
+                    len: length as u32,
                 }
                 .encode(&mut rans_coder, &mut state, config);
-                pos += m.length;
+                pos += length;
                 encoded_match = true;
             }
         }
@@ -39,7 +40,8 @@ pub fn pack(
                     .iter()
                     .zip(data[(pos - offset)..].iter())
                     .take_while(|(a, b)| a == b)
-                    .count();
+                    .count()
+                    .min(config.max_length);
                 if length >= config.min_length() {
                     lz::Op::Match {
                         offset: offset as u32,

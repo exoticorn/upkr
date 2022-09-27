@@ -105,7 +105,7 @@ fn parse(
         cost_counter: &mut CostCounter,
         pos: usize,
         offset: usize,
-        length: usize,
+        mut length: usize,
         arrival: &Arrival,
         max_arrivals: usize,
         config: &crate::Config,
@@ -113,6 +113,7 @@ fn parse(
         if length < config.min_length() {
             return;
         }
+        length = length.min(config.max_length);
         cost_counter.reset();
         let mut state = arrival.state.clone();
         let op = lz::Op::Match {
@@ -186,19 +187,21 @@ fn parse(
             for m in match_finder.matches(pos) {
                 closest_match = Some(closest_match.unwrap_or(0).max(m.pos));
                 let offset = pos - m.pos;
-                found_last_offset |= offset as u32 == arrival.state.last_offset();
-                add_match(
-                    &mut arrivals,
-                    cost_counter,
-                    pos,
-                    offset,
-                    m.length,
-                    &arrival,
-                    max_arrivals,
-                    encoding_config,
-                );
-                if m.length >= config.greedy_size {
-                    break 'arrival_loop;
+                if offset <= encoding_config.max_offset {
+                    found_last_offset |= offset as u32 == arrival.state.last_offset();
+                    add_match(
+                        &mut arrivals,
+                        cost_counter,
+                        pos,
+                        offset,
+                        m.length,
+                        &arrival,
+                        max_arrivals,
+                        encoding_config,
+                    );
+                    if m.length >= config.greedy_size {
+                        break 'arrival_loop;
+                    }
                 }
             }
 
@@ -209,6 +212,9 @@ fn parse(
                 && closest_match.iter().all(|p| *p < match_pos)
             {
                 let offset = pos - match_pos;
+                if offset > encoding_config.max_offset {
+                    break;
+                }
                 let length = match_length(offset);
                 assert!(length > 0);
                 add_match(

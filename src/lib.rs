@@ -5,10 +5,11 @@ mod match_finder;
 mod parsing_packer;
 mod rans;
 
-pub use lz::{calculate_margin, unpack};
+pub use lz::{calculate_margin, unpack, UnpackError};
 
 pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);
 
+#[derive(Debug)]
 pub struct Config {
     pub use_bitstream: bool,
     pub parity_contexts: usize,
@@ -23,6 +24,9 @@ pub struct Config {
 
     pub no_repeated_offsets: bool,
     pub eof_in_length: bool,
+
+    pub max_offset: usize,
+    pub max_length: usize,
 }
 
 impl Default for Config {
@@ -41,6 +45,9 @@ impl Default for Config {
 
             no_repeated_offsets: false,
             eof_in_length: false,
+
+            max_offset: usize::MAX,
+            max_length: usize::MAX,
         }
     }
 }
@@ -58,13 +65,13 @@ impl Config {
 pub fn pack(
     data: &[u8],
     level: u8,
-    config: Config,
+    config: &Config,
     progress_callback: Option<ProgressCallback>,
 ) -> Vec<u8> {
     if level == 0 {
-        greedy_packer::pack(data, &config, progress_callback)
+        greedy_packer::pack(data, config, progress_callback)
     } else {
-        parsing_packer::pack(data, level, &config, progress_callback)
+        parsing_packer::pack(data, level, config, progress_callback)
     }
 }
 

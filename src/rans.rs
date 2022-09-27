@@ -1,4 +1,5 @@
 use crate::{context_state::Context, Config};
+use thiserror::Error;
 
 pub const PROB_BITS: u32 = 8;
 pub const ONE_PROB: u32 = 1 << PROB_BITS;
@@ -160,6 +161,10 @@ pub struct RansDecoder<'a> {
 
 const PROB_MASK: u32 = ONE_PROB - 1;
 
+#[derive(Debug, Error)]
+#[error("Unexpected end of input")]
+pub struct UnexpectedEOF;
+
 impl<'a> RansDecoder<'a> {
     pub fn new(data: &'a [u8], config: &Config) -> RansDecoder<'a> {
         RansDecoder {
@@ -178,17 +183,20 @@ impl<'a> RansDecoder<'a> {
         self.pos
     }
 
-    pub fn decode_with_context(&mut self, context: &mut Context) -> bool {
-        let bit = self.decode_bit(context.prob());
+    pub fn decode_with_context(&mut self, context: &mut Context) -> Result<bool, UnexpectedEOF> {
+        let bit = self.decode_bit(context.prob())?;
         context.update(bit);
-        bit
+        Ok(bit)
     }
 
-    pub fn decode_bit(&mut self, prob: u16) -> bool {
+    pub fn decode_bit(&mut self, prob: u16) -> Result<bool, UnexpectedEOF> {
         let prob = prob as u32;
         if self.use_bitstream {
             while self.state < 32768 {
                 if self.bits_left == 0 {
+                    if self.pos >= self.data.len() {
+                        return Err(UnexpectedEOF);
+                    }
                     self.byte = self.data[self.pos];
                     self.pos += 1;
                     self.bits_left = 8;
@@ -204,8 +212,11 @@ impl<'a> RansDecoder<'a> {
             }
         } else {
             while self.state < 4096 {
-                self.state = (self.state << 8) | self.data[0] as u32;
-                self.data = &self.data[1..];
+                if self.pos >= self.data.len() {
+                    return Err(UnexpectedEOF);
+                }
+                self.state = (self.state << 8) | self.data[self.pos] as u32;
+                self.pos += 1;
             }
         }
 
@@ -218,6 +229,6 @@ impl<'a> RansDecoder<'a> {
         };
         self.state = prob * (self.state >> PROB_BITS) + (self.state & PROB_MASK) - start;
 
-        bit ^ self.invert_bit_encoding
+        Ok(bit ^ self.invert_bit_encoding)
     }
 }
