@@ -4,7 +4,7 @@
 ;; initial version by Peter "Ped" Helcmanovsky (C) 2022, licensed same as upkr project ("unlicensed")
 ;; to assemble use z00m's sjasmplus: https://github.com/z00m128/sjasmplus
 ;;
-;; you can define UPKR_PROBS_ORIGIN to specific 256 byte aligned address for probs array (386 bytes),
+;; you can define UPKR_PROBS_ORIGIN to specific 256 byte aligned address for probs array (320 bytes),
 ;; otherwise it will be positioned after the unpacker code (256 aligned)
 ;;
 ;; public API:
@@ -15,11 +15,14 @@
 ;;         modifies: all registers except IY, requires 10 bytes of stack space
 ;;
 
-;     DEFINE BACKWARDS_UNPACK         ; uncomment to build backwards depacker
+;     DEFINE BACKWARDS_UNPACK         ; uncomment to build backwards depacker (write_ptr--, upkr_data_ptr--)
             ; initial IX points at last byte of compressed data
             ; initial DE' points at last byte of unpacked data
 
 ;     DEFINE UPKR_UNPACK_SPEED        ; uncomment to get larger but faster unpack routine
+
+; code size hint: if you put probs array just ahead of BASIC entry point, you will get BC
+; initialised to probs.e by BASIC `USR` command and you can remove it from unpack init (-3B)
 
     OPT push reset --syntax=abf
     MODULE upkr
@@ -122,8 +125,7 @@ unpack:
     cp      d                   ; CF = prev_was_match
     call    nc,decode_bit       ; if not prev_was_match, then upkr_decode_bit(256)
     jr      nc,.keep_offset     ; if neither, keep old offset
-    inc     c                   ; context_index to first "number" set for offsets decoding (257)
-    call    decode_number
+    call    decode_number       ; context_index is already 257-1 as needed by decode_number
     dec     de                  ; offset = upkr_decode_length(257) - 1;
     ld      a,d
     or      e
@@ -136,20 +138,25 @@ unpack:
         ;                 ++write_ptr;
         ;             }
         ;             prev_was_match = 1;
-    ld      c,low(257 + NUMBER_BITS)    ; context_index to second "number" set for lengths decoding
+    ld      c,low(257 + NUMBER_BITS - 1)    ; context_index to second "number" set for lengths decoding
     call    decode_number       ; length = upkr_decode_length(257 + 64);
     push    de
     exx
-    ld      h,d                 ; DE = write_ptr
-    ld      l,e
-.offset+*:  ld      bc,0
     IFNDEF BACKWARDS_UNPACK
-    sbc     hl,bc               ; CF=0 from decode_number ; HL = write_ptr - offset
+        ; forward unpack (write_ptr++, upkr_data_ptr++)
+        ld      h,d             ; DE = write_ptr
+        ld      l,e
+.offset+*:  ld  bc,0
+        sbc     hl,bc           ; CF=0 from decode_number ; HL = write_ptr - offset
+        pop     bc              ; BC = length
+        ldir
     ELSE
-    add     hl,bc               ; HL = write_ptr + offset
+        ; backward unpack (write_ptr--, upkr_data_ptr--)
+.offset+*:  ld  hl,0
+        add     hl,de           ; HL = write_ptr + offset
+        pop     bc              ; BC = length
+        lddr
     ENDIF
-    pop     bc                  ; BC = length
-    IFNDEF BACKWARDS_UNPACK : ldir : ELSE : lddr : ENDIF
     exx
     ld      d,b                 ; prev_was_match = true
     djnz    .decompress_data    ; adjust context_index back to 0..255 range, go to main loop
@@ -183,6 +190,9 @@ int upkr_decode_bit(int context_index) {
     return bit;
 }
 */
+inc_c_decode_bit:
+  ; ++low(context_index) before decode_bit (to get -1B by two calls in decode_number)
+    inc     c
 decode_bit:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
@@ -259,16 +269,16 @@ decode_bit:
     ; so 7*128 > 250 and thus edge case `ADD hl=(7*128+0),de=(-250)` => CF=1
 .bit_is_0_2:
  ; *** adjust probs[context_index]
-    ld      e,a                     ; preserve prob
     rra                             ; + (bit<<4) ; part of -prob_offset, needs another -16
     and     $FC                     ; clear/keep correct bits to get desired (prob>>4) + extras, CF=0
     rra
     rra
     rra                             ; A = (bit<<4) + (prob>>4), CF=(prob & 8)
     adc     a,-16                   ; A = (bit<<4) - 16 + ((prob + 8)>>4) ; -prob_offset = (bit<<4) - 16
-    sub     e                       ; A = (bit<<4) - 16 + ((prob + 8)>>4) - prob ; = ((prob + 8)>>4) - prob_offset - prob
-    neg                             ; A = prob_offset + prob - ((prob + 8)>>4)
+    ld      e,a
     pop     bc
+    ld      a,(bc)                  ; A = prob (cheaper + shorter to re-read again from memory)
+    sub     e                       ; A = 16 - (bit<<4) + prob - ((prob + 8)>>4) ; = prob_offset + prob - ((prob + 8)>>4)
     ld      (bc),a                  ; probs[context_index] = prob_offset + prob - ((prob + 8) >> 4);
     add     a,d                     ; restore CF = bit (D = bit ? $FF : $00 && A > 0)
     pop     de
@@ -288,19 +298,16 @@ int upkr_decode_length(int context_index) {
 decode_number:
   ; HL = upkr_state
   ; IX = upkr_data_ptr
-  ; BC = probs+context_index
+  ; BC = probs+context_index-1
   ; A' = upkr_current_byte (!!! init to 0x80 at start, not 0x00)
   ; return length in DE, CF=0
-    ld      de,$7FFF            ; length = 0 with positional-stop-bit
-    jr      .loop_entry
+    ld      de,$FFFF            ; length = 0 with positional-stop-bit
+    or      a                   ; CF=0 to skip getting data bit and use only `rr d : rr e` to fix init DE
 .loop:
-    inc     c                   ; context_index + 1
-    call    decode_bit
+    call    c,inc_c_decode_bit  ; get data bit, context_index + 1 / if CF=0 just add stop bit into DE init
     rr      d
     rr      e                   ; DE = length = (length >> 1) | (bit << 15);
-    inc     c                   ; context_index += 2
-.loop_entry:
-    call    decode_bit
+    call    inc_c_decode_bit    ; context_index += 2
     jr      c,.loop
 .fix_bit_pos:
     ccf                         ; NC will become this final `| (1 << bit_pos)` bit
@@ -323,6 +330,52 @@ probs:      EQU ($ + 255) & -$100                       ; probs array aligned to
 .e:         EQU probs + .c
 
     DISPLAY "upkr.unpack probs array placed at: ",/A,probs,",\tsize: ",/A,probs.c
+
+/*
+ archived: negligibly faster but +6B longer decode_number variant using HL' and BC' to
+ do `number|=(1<<bit_pos);` type of logic in single loop.
+*/
+; decode_number:
+;     exx
+;     ld      bc,1
+;     ld      l,b
+;     ld      h,b                 ; HL = 0
+; .loop
+;     exx
+;     inc     c
+;     call    decode_bit
+;     jr      nc,.done
+;     inc     c
+;     call    decode_bit
+;     exx
+;     jr      nc,.b0
+;     add     hl,bc
+; .b0:
+;     sla     c
+;     rl      b
+;     jr      .loop
+; .done:
+;     exx
+;     add     hl,bc
+;     push    hl
+;     exx
+;     pop     de
+;     ret
+
+/*
+ archived: possible LUT variant of updating probs value, requires 512-aligned 512B table (not tested)
+*/
+; code is replacing decode_bit from "; *** adjust probs[context_index]", followed by `ld (bc),a : add a,d ...`
+;     ld      c,a
+;     ld      a,high(probs_update_table)/2    ; must be 512 aligned
+;     rla
+;     ld      b,a
+;     ld      a,(bc)
+;     pop     bc
+; -------------------------------------------
+; probs_update_table: EQU probs-512
+; -------------------------------------------
+; table generator is not obvious and probably not short either, 20+ bytes almost for sure, maybe even 30-40
 
     ENDMODULE
     OPT pop
