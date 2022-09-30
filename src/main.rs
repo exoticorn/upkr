@@ -49,6 +49,12 @@ fn main() -> Result<()> {
                 config.is_match_bit = false;
                 config.new_offset_bit = false;
             }
+            Long("x86b") => {
+                config.use_bitstream = true;
+                config.continue_value_bit = false;
+                config.no_repeated_offsets = true;
+                level = 9;
+            }
 
             Short('u') | Long("unpack") => unpack = true,
             Long("margin") => calculate_margin = true,
@@ -153,6 +159,9 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9");
     eprintln!(
         " --x86               --bitstream --invert-is-match-bit --invert-continue-value-bit --invert-new-offset-bit"
+    );
+    eprintln!(
+        " --x86b              --bitstream --invert-continue-value-bit --no-repeated-offsets -9"
     );
     eprintln!();
     eprintln!("Config options (need to match when packing/unpacking):");
