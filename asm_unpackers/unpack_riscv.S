@@ -1,13 +1,11 @@
 .section .text
 
-#define FRAME_SIZE (256+32*4+4)
-
-// x8 prob array ptr
 // x9 prev was literal
 // x10 out ptr
 // x11 in ptr
 // x12 offset
 // x13 state
+// x14 context index
 
 .global upkr_unpack
 .type upkr_unpack, %function
@@ -15,11 +13,11 @@ upkr_unpack:
 	mv t4, ra
 	mv x17, x8
 	mv t6, x9
-	li x13, FRAME_SIZE
-	li x9, 128
+	li x9, 256 + 128
+	mv x13, x9
 1:
-	addi sp, sp, -1
-	sb x9, 0(sp)
+	sub x8, sp, x13
+	sb x9, 0(x8)
 	addi x13, x13, -1
 	bnez x13, 1b
 	
@@ -35,7 +33,7 @@ upkr_unpack:
 
 .Lfinished_offset:
 	addi x14, x14, 64
-	jal t3, upkr_decode_number
+	jal upkr_decode_number
 1:
 	add x14, x10, t0
 	lbu x14, (x14)
@@ -58,11 +56,10 @@ upkr_unpack:
 .Lread_offset_inc_x14:
 	addi x14, x14, 1
 .Lread_offset:
-	jal t3, upkr_decode_number
+	jal upkr_decode_number
 	addi t0, x9, 1
 	bnez t0, .Lfinished_offset
 .Ldone:
-	addi sp, sp, FRAME_SIZE
 	mv x8, x17
 	mv x9, t6
 	jr t4
@@ -70,20 +67,21 @@ upkr_unpack:
 // x14 context index
 // return: x9 negtive decoded number 
 upkr_decode_number:
+	mv t3, ra
 	mv t5, x14
 	li x9, 0
-	li x8, -1
+	li t1, -1
 1:
 	jal upkr_decode_bit
 	beqz x15, 1f
 	jal upkr_decode_bit
 	beqz x15, 2f
-	add x9, x9, x8
+	add x9, x9, t1
 2:
-	slli x8, x8, 1
+	add t1, t1, t1
 	j 1b
 1:
-	add x9, x9, x8
+	add x9, x9, t1
 	
 	mv x14, t5
 	jr t3
@@ -104,39 +102,37 @@ upkr_decode_bit:
 	srli x15, x13, 12
 	beqz x15, upkr_load_byte
 
-	mv t1, x14
-	mv t2, x10
+	addi x14, x14, 1
 	
-	add x14, x14, sp
-	lbu x12, 0(x14)
+	sub sp, sp, x14
+	lbu x12, 0(sp)
 	
-	andi x10, x13, 255
-	sltu x15, x10, x12
+	andi x8, x13, 255
+	sltu x15, x8, x12
 	srli x13, x13, 8
 	beqz x15, .Lelse
 	
 	mul x13, x13, x12
-	add x13, x13, x10
-	li x10, 256 + 8
-	sub x10, x10, x12
-	srli x10, x10, 4
-	add x12, x12, x10
+	add x13, x13, x8
+	li x8, 256 + 8
+	sub x8, x8, x12
+	srli x8, x8, 4
+	add x12, x12, x8
 	j .Lendif
 
 .Lelse:
 	li x16, 256
 	sub x16, x16, x12
 	mul x13, x13, x16
-	add x13, x13, x10
+	add x13, x13, x8
 	sub x13, x13, x12
-	addi x10, x12, 8
-	srli x10, x10, 4
-	sub x12, x12, x10
+	addi x8, x12, 8
+	srli x8, x8, 4
+	sub x12, x12, x8
 
 .Lendif:
 
-	sb x12, 0(x14)
+	sb x12, 0(sp)
+	add sp, sp, x14
 	
-	addi x14, t1, 1
-	mv x10, t2
 	ret
