@@ -33,7 +33,7 @@ upkr_unpack:
 
 .Lfinished_offset:
 	addi x14, x14, 64
-	jal upkr_decode_number
+	jalr ra // jal upkr_decode_number
 1:
 	add x14, x10, t0
 	lbu x14, (x14)
@@ -56,13 +56,57 @@ upkr_unpack:
 .Lread_offset_inc_x14:
 	addi x14, x14, 1
 .Lread_offset:
-	jal upkr_decode_number
+	jalr ra // jal upkr_decode_number
 	addi t0, x9, 1
 	bnez t0, .Lfinished_offset
 .Ldone:
 	mv x8, x17
 	mv x9, t6
 	jr t4
+
+upkr_load_byte:
+	lbu x15, 0(x11)
+	addi x11, x11, 1
+	slli x13, x13, 8
+	add x13, x13, x15
+// x8 prob array ptr
+// x11 in ptr
+// x13 state
+// x14 context index
+// return:
+//   x14 context index + 1
+//   x15 decoded bit
+upkr_decode_bit:
+	srli x15, x13, 12
+	beqz x15, upkr_load_byte
+
+	addi x14, x14, 1
+	
+	sub t2, sp, x14
+	lbu x12, 0(t2)
+	
+	andi x8, x13, 255
+	sltu x15, x8, x12
+	beqz x15, 1f
+	xori x12, x12, 255
+	addi x12, x12, 1
+1:
+	srli x8, x13, 8
+	addi x8, x8, 1
+	sub x8, x8, x15
+	mul x8, x8, x12
+	sub x13, x13, x8
+	
+	addi x8, x12, 8
+	srli x8, x8, 4
+	sub x12, x12, x8
+	beqz x15, 1f
+	sub x12, x0, x12
+1:
+
+	sb x12, 0(t2)
+	
+	jalr ra
 
 // x14 context index
 // return: x9 negtive decoded number 
@@ -85,54 +129,3 @@ upkr_decode_number:
 	
 	mv x14, t5
 	jr t3
-
-upkr_load_byte:
-	lbu x15, 0(x11)
-	addi x11, x11, 1
-	slli x13, x13, 8
-	add x13, x13, x15
-// x8 prob array ptr
-// x11 in ptr
-// x13 state
-// x14 context index
-// return:
-//   x14 context index + 1
-//   x15 decoded bit
-upkr_decode_bit:
-	srli x15, x13, 12
-	beqz x15, upkr_load_byte
-
-	addi x14, x14, 1
-	
-	sub sp, sp, x14
-	lbu x12, 0(sp)
-	
-	andi x8, x13, 255
-	sltu x15, x8, x12
-	srli x13, x13, 8
-	beqz x15, .Lelse
-	
-	mul x13, x13, x12
-	add x13, x13, x8
-	li x8, 256 + 8
-	sub x8, x8, x12
-	srli x8, x8, 4
-	add x12, x12, x8
-	j .Lendif
-
-.Lelse:
-	li x16, 256
-	sub x16, x16, x12
-	mul x13, x13, x16
-	add x13, x13, x8
-	sub x13, x13, x12
-	addi x8, x12, 8
-	srli x8, x8, 4
-	sub x12, x12, x8
-
-.Lendif:
-
-	sb x12, 0(sp)
-	add sp, sp, x14
-	
-	ret
