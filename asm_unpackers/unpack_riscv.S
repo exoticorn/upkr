@@ -83,7 +83,7 @@ upkr_decode_bit:
 	addi x14, x14, 1
 	
 	sub t2, sp, x14
-	lbu x12, 0(t2)
+	lbu x12, (t2)
 	
 	andi x8, x13, 255
 	sltu x15, x8, x12
@@ -104,7 +104,7 @@ upkr_decode_bit:
 	sub x12, x0, x12
 1:
 
-	sb x12, 0(t2)
+	sb x12, (t2)
 	
 	jalr ra
 
