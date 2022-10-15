@@ -15,7 +15,7 @@ pub fn pack(
     let mut parse = parse(data, Config::from_level(level), config, progress_cb);
     let mut ops = vec![];
     while let Some(link) = parse {
-        ops.push(link.op);
+        ops.push(link.op.clone());
         parse = link.prev.clone();
     }
     let mut state = lz::CoderState::new(config);
@@ -32,9 +32,15 @@ struct Parse {
     op: lz::Op,
 }
 
+struct LiteralPrefix {
+    arrival: Arrival,
+    prefix: Vec<u8>,
+}
+
 struct Arrival {
     parse: Option<Rc<Parse>>,
     state: lz::CoderState,
+    literal_prefix: Option<Box<LiteralPrefix>>,
     cost: f64,
 }
 
@@ -130,6 +136,7 @@ fn parse(
                     op,
                 })),
                 state,
+                literal_prefix: None,
                 cost: arrival.cost + cost_counter.cost(),
             },
             max_arrivals,
@@ -141,6 +148,7 @@ fn parse(
         Arrival {
             parse: None,
             state: lz::CoderState::new(encoding_config),
+            literal_prefix: None,
             cost: 0.0,
         },
         max_arrivals,
@@ -252,19 +260,26 @@ fn parse(
             }
 
             cost_counter.reset();
-            let mut state = arrival.state;
-            let op = lz::Op::Literal(data[pos]);
+            let (arrival, mut prefix) = if let Some(prefix) = arrival.literal_prefix {
+                (prefix.arrival, prefix.prefix)
+            } else {
+                (arrival, vec![])
+            };
+            let mut state = arrival.state.clone();
+            prefix.push(data[pos]);
+            let op = lz::Op::Literal(prefix.clone());
             op.encode(cost_counter, &mut state, encoding_config);
             add_arrival(
                 &mut arrivals,
                 pos + 1,
                 Arrival {
                     parse: Some(Rc::new(Parse {
-                        prev: arrival.parse,
+                        prev: arrival.parse.clone(),
                         op,
                     })),
                     state,
                     cost: arrival.cost + cost_counter.cost(),
+                    literal_prefix: Some(Box::new(LiteralPrefix { arrival, prefix })),
                 },
                 max_arrivals,
             );

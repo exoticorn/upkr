@@ -12,6 +12,8 @@ pub fn pack(
     let mut rans_coder = RansCoder::new(config);
     let mut state = lz::CoderState::new(config);
 
+    let mut literal = vec![];
+
     let mut pos = 0;
     while pos < data.len() {
         if let Some(ref mut cb) = progress_callback {
@@ -22,6 +24,10 @@ pub fn pack(
             let max_offset = config.max_offset.min(1 << (m.length * 3 - 1).min(31));
             let offset = pos - m.pos;
             if offset < max_offset && m.length >= config.min_length() {
+                if !literal.is_empty() {
+                    lz::Op::Literal(literal).encode(&mut rans_coder, &mut state, config);
+                    literal = vec![];
+                }
                 let length = m.length.min(config.max_length);
                 lz::Op::Match {
                     offset: offset as u32,
@@ -43,6 +49,10 @@ pub fn pack(
                     .count()
                     .min(config.max_length);
                 if length >= config.min_length() {
+                    if !literal.is_empty() {
+                        lz::Op::Literal(literal).encode(&mut rans_coder, &mut state, config);
+                        literal = vec![];
+                    }
                     lz::Op::Match {
                         offset: offset as u32,
                         len: length as u32,
@@ -55,11 +65,14 @@ pub fn pack(
         }
 
         if !encoded_match {
-            lz::Op::Literal(data[pos]).encode(&mut rans_coder, &mut state, config);
+            literal.push(data[pos]);
             pos += 1;
         }
     }
 
+    if !literal.is_empty() {
+        lz::Op::Literal(literal).encode(&mut rans_coder, &mut state, config);
+    }
     lz::encode_eof(&mut rans_coder, &mut state, config);
     rans_coder.finish()
 }

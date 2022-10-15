@@ -3,29 +3,40 @@ use crate::rans::{EntropyCoder, RansDecoder};
 use crate::Config;
 use thiserror::Error;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Op {
-    Literal(u8),
+    Literal(Vec<u8>),
     Match { offset: u32, len: u32 },
 }
 
 impl Op {
     pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
-        let literal_base = state.pos % state.parity_contexts * 256;
         match self {
-            &Op::Literal(lit) => {
-                encode_bit(coder, state, literal_base, !config.is_match_bit);
-                let mut context_index = 1;
-                for i in (0..8).rev() {
-                    let bit = (lit >> i) & 1 != 0;
-                    encode_bit(coder, state, literal_base + context_index, bit);
-                    context_index = (context_index << 1) | bit as usize;
+            &Op::Literal(ref lit) => {
+                assert!(state.prev_was_match);
+                encode_length(
+                    coder,
+                    state,
+                    256 * state.parity_contexts + 129,
+                    lit.len() as u32 + 1,
+                    config,
+                );
+                for lit in lit {
+                    let literal_base = state.pos % state.parity_contexts * 256;
+                    let mut context_index = 1;
+                    for i in (0..8).rev() {
+                        let bit = (lit >> i) & 1 != 0;
+                        encode_bit(coder, state, literal_base + context_index, bit);
+                        context_index = (context_index << 1) | bit as usize;
+                    }
+                    state.pos += 1;
                 }
                 state.prev_was_match = false;
-                state.pos += 1;
             }
             &Op::Match { offset, len } => {
-                encode_bit(coder, state, literal_base, config.is_match_bit);
+                if state.prev_was_match {
+                    encode_length(coder, state, 256 * state.parity_contexts + 129, 1, config);
+                }
                 let mut new_offset = true;
                 if !state.prev_was_match && !config.no_repeated_offsets {
                     new_offset = offset != state.last_offset;
@@ -57,12 +68,9 @@ impl Op {
 }
 
 pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
-    encode_bit(
-        coder,
-        state,
-        state.pos % state.parity_contexts * 256,
-        config.is_match_bit,
-    );
+    if state.prev_was_match {
+        encode_length(coder, state, 256 * state.parity_contexts + 129, 1, config);
+    }
     if !state.prev_was_match && !config.no_repeated_offsets {
         encode_bit(
             coder,
@@ -119,9 +127,12 @@ pub struct CoderState {
 impl CoderState {
     pub fn new(config: &Config) -> CoderState {
         CoderState {
-            contexts: ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, config),
+            contexts: ContextState::new(
+                (1 + 255) * config.parity_contexts + 1 + 64 + 64 + 64,
+                config,
+            ),
             last_offset: 0,
-            prev_was_match: false,
+            prev_was_match: true,
             pos: 0,
             parity_contexts: config.parity_contexts,
         }
@@ -168,7 +179,10 @@ pub fn unpack_internal(
     max_size: usize,
 ) -> Result<isize, UnpackError> {
     let mut decoder = RansDecoder::new(packed_data, &config);
-    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, &config);
+    let mut contexts = ContextState::new(
+        (1 + 255) * config.parity_contexts + 1 + 64 + 64 + 64,
+        &config,
+    );
     let mut offset = usize::MAX;
     let mut position = 0usize;
     let mut prev_was_match = false;
@@ -199,50 +213,14 @@ pub fn unpack_internal(
 
     loop {
         margin = margin.max(position as isize - decoder.pos() as isize);
-        let literal_base = position % config.parity_contexts * 256;
-        if decoder.decode_with_context(&mut contexts.context_mut(literal_base))?
-            == config.is_match_bit
-        {
-            if config.no_repeated_offsets
-                || prev_was_match
-                || decoder
-                    .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))?
-                    == config.new_offset_bit
-            {
-                offset = decode_length(
-                    &mut decoder,
-                    &mut contexts,
-                    256 * config.parity_contexts + 1,
-                    &config,
-                )? - if config.eof_in_length { 0 } else { 1 };
-                if offset == 0 {
-                    break;
-                }
-            }
-            let length = decode_length(
-                &mut decoder,
-                &mut contexts,
-                256 * config.parity_contexts + 65,
-                &config,
-            )?;
-            if config.eof_in_length && length == 1 {
-                break;
-            }
-            if offset > position {
-                return Err(UnpackError::OffsetOutOfRange { offset, position });
-            }
-            if let Some(ref mut result) = result {
-                for _ in 0..length {
-                    if result.len() < max_size {
-                        result.push(result[result.len() - offset]);
-                    } else {
-                        break;
-                    }
-                }
-            }
-            position += length;
-            prev_was_match = true;
-        } else {
+        let literal_length = decode_length(
+            &mut decoder,
+            &mut contexts,
+            256 * config.parity_contexts + 129,
+            config,
+        )? - 1;
+        for _ in 0..literal_length {
+            let literal_base = position % config.parity_contexts * 256;
             let mut context_index = 1;
             let mut byte = 0;
             for i in (0..8).rev() {
@@ -259,6 +237,46 @@ pub fn unpack_internal(
             position += 1;
             prev_was_match = false;
         }
+
+        if config.no_repeated_offsets
+            || prev_was_match
+            || decoder
+                .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))?
+                == config.new_offset_bit
+        {
+            offset = decode_length(
+                &mut decoder,
+                &mut contexts,
+                256 * config.parity_contexts + 1,
+                &config,
+            )? - if config.eof_in_length { 0 } else { 1 };
+            if offset == 0 {
+                break;
+            }
+        }
+        let length = decode_length(
+            &mut decoder,
+            &mut contexts,
+            256 * config.parity_contexts + 65,
+            &config,
+        )?;
+        if config.eof_in_length && length == 1 {
+            break;
+        }
+        if offset > position {
+            return Err(UnpackError::OffsetOutOfRange { offset, position });
+        }
+        if let Some(ref mut result) = result {
+            for _ in 0..length {
+                if result.len() < max_size {
+                    result.push(result[result.len() - offset]);
+                } else {
+                    break;
+                }
+            }
+        }
+        position += length;
+        prev_was_match = true;
     }
 
     if position > max_size {
