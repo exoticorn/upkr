@@ -17,12 +17,12 @@ impl Op {
                 encode_length(
                     coder,
                     state,
-                    256 * state.parity_contexts + 129,
+                    256 + state.pos % state.parity_contexts * 320,
                     lit.len() as u32 + 1,
                     config,
                 );
                 for lit in lit {
-                    let literal_base = state.pos % state.parity_contexts * 256;
+                    let literal_base = state.pos % state.parity_contexts * 320;
                     let mut context_index = 1;
                     for i in (0..8).rev() {
                         let bit = (lit >> i) & 1 != 0;
@@ -35,7 +35,13 @@ impl Op {
             }
             &Op::Match { offset, len } => {
                 if state.prev_was_match {
-                    encode_length(coder, state, 256 * state.parity_contexts + 129, 1, config);
+                    encode_length(
+                        coder,
+                        state,
+                        256 + state.pos % state.parity_contexts * 320,
+                        1,
+                        config,
+                    );
                 }
                 let mut new_offset = true;
                 if !state.prev_was_match && !config.no_repeated_offsets {
@@ -43,7 +49,7 @@ impl Op {
                     encode_bit(
                         coder,
                         state,
-                        256 * state.parity_contexts,
+                        320 * state.parity_contexts,
                         new_offset == config.new_offset_bit,
                     );
                 }
@@ -52,14 +58,14 @@ impl Op {
                     encode_length(
                         coder,
                         state,
-                        256 * state.parity_contexts + 1,
+                        320 * state.parity_contexts + 1,
                         offset + if config.eof_in_length { 0 } else { 1 },
                         config,
                     );
                     state.last_offset = offset;
                 }
                 assert!(len as usize >= config.min_length() && len as usize <= config.max_length);
-                encode_length(coder, state, 256 * state.parity_contexts + 65, len, config);
+                encode_length(coder, state, 320 * state.parity_contexts + 65, len, config);
                 state.prev_was_match = true;
                 state.pos += len as usize;
             }
@@ -69,21 +75,27 @@ impl Op {
 
 pub fn encode_eof(coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
     if state.prev_was_match {
-        encode_length(coder, state, 256 * state.parity_contexts + 129, 1, config);
+        encode_length(
+            coder,
+            state,
+            256 + state.pos % state.parity_contexts * 320,
+            1,
+            config,
+        );
     }
     if !state.prev_was_match && !config.no_repeated_offsets {
         encode_bit(
             coder,
             state,
-            256 * state.parity_contexts,
+            320 * state.parity_contexts,
             config.new_offset_bit ^ config.eof_in_length,
         );
     }
     if !config.eof_in_length || state.prev_was_match || config.no_repeated_offsets {
-        encode_length(coder, state, 256 * state.parity_contexts + 1, 1, config);
+        encode_length(coder, state, 320 * state.parity_contexts + 1, 1, config);
     }
     if config.eof_in_length {
-        encode_length(coder, state, 256 * state.parity_contexts + 65, 1, config);
+        encode_length(coder, state, 320 * state.parity_contexts + 65, 1, config);
     }
 }
 
@@ -127,10 +139,7 @@ pub struct CoderState {
 impl CoderState {
     pub fn new(config: &Config) -> CoderState {
         CoderState {
-            contexts: ContextState::new(
-                (1 + 255) * config.parity_contexts + 1 + 64 + 64 + 64,
-                config,
-            ),
+            contexts: ContextState::new((64 + 256) * config.parity_contexts + 1 + 64 + 64, config),
             last_offset: 0,
             prev_was_match: true,
             pos: 0,
@@ -179,10 +188,8 @@ pub fn unpack_internal(
     max_size: usize,
 ) -> Result<isize, UnpackError> {
     let mut decoder = RansDecoder::new(packed_data, &config);
-    let mut contexts = ContextState::new(
-        (1 + 255) * config.parity_contexts + 1 + 64 + 64 + 64,
-        &config,
-    );
+    let mut contexts =
+        ContextState::new((64 + 256) * config.parity_contexts + 1 + 64 + 64, &config);
     let mut offset = usize::MAX;
     let mut position = 0usize;
     let mut prev_was_match = false;
@@ -216,11 +223,11 @@ pub fn unpack_internal(
         let literal_length = decode_length(
             &mut decoder,
             &mut contexts,
-            256 * config.parity_contexts + 129,
+            256 + position % config.parity_contexts * 320,
             config,
         )? - 1;
         for _ in 0..literal_length {
-            let literal_base = position % config.parity_contexts * 256;
+            let literal_base = position % config.parity_contexts * 320;
             let mut context_index = 1;
             let mut byte = 0;
             for i in (0..8).rev() {
@@ -241,13 +248,13 @@ pub fn unpack_internal(
         if config.no_repeated_offsets
             || prev_was_match
             || decoder
-                .decode_with_context(&mut contexts.context_mut(256 * config.parity_contexts))?
+                .decode_with_context(&mut contexts.context_mut(320 * config.parity_contexts))?
                 == config.new_offset_bit
         {
             offset = decode_length(
                 &mut decoder,
                 &mut contexts,
-                256 * config.parity_contexts + 1,
+                320 * config.parity_contexts + 1,
                 &config,
             )? - if config.eof_in_length { 0 } else { 1 };
             if offset == 0 {
@@ -257,7 +264,7 @@ pub fn unpack_internal(
         let length = decode_length(
             &mut decoder,
             &mut contexts,
-            256 * config.parity_contexts + 65,
+            320 * config.parity_contexts + 65,
             &config,
         )?;
         if config.eof_in_length && length == 1 {
