@@ -61,6 +61,10 @@ fn main() -> Result<()> {
             Short('l') | Long("level") => level = parser.value()?.parse()?,
             Short(n) if n.is_ascii_digit() => level = n as u8 - b'0',
             Short('h') | Long("help") => print_help(0),
+            Long("version") => {
+                println!("{}", env!("CARGO_PKG_VERSION"));
+                process::exit(0);
+            }
             Long("max-unpacked-size") => max_unpacked_size = parser.value()?.parse()?,
             Value(val) if infile.is_none() => infile = Some(val.try_into()?),
             Value(val) if outfile.is_none() => outfile = Some(val.try_into()?),
@@ -154,6 +158,8 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" -0, ..., -9         short form for setting compression level");
     eprintln!(" -u, --unpack        unpack infile");
     eprintln!(" --margin            calculate margin for overlapped unpacking of a packed file");
+    eprintln!();
+    eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("Config presets for specific unpackers:");
     eprintln!(" --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9");

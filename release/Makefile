@@ -1,4 +1,4 @@
-VERSION=0.2.0
+VERSION := $(shell cargo run --release -- --version)
 
 all: clean upkr-linux-$(VERSION).tgz upkr-windows-$(VERSION).zip
 
