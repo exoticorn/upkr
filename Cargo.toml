@@ -1,6 +1,6 @@
 [package]
 name = "upkr"
-version = "0.2.0-pre3"
+version = "0.2.0"
 edition = "2021"
 
 [profile.release]

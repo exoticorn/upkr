@@ -2,13 +2,57 @@
 
 Upkr is a simple general purpose lz packer designed to be used in the [MicroW8](https://github.com/exoticorn/microw8) platform.
 The compressed format is losely based on [Shrinkler](https://github.com/askeksa/Shrinkler) with the main difference being that
-Upkr doesn't differnetiate between literals at odd or even addresses and that I went with rANS/rABS instead of a range coder.
+Upkr doesn't differentiate between literals at odd or even addresses (by default) and that I went with rANS/rABS instead of a range coder.
 
-At this point, Upkr should still be considered unstable - the compressed format is not very likely to change but I still want
-to keep that option open a little longer.
+Compression rate is on par with Shrinkler.
+
+The differences compare to Shrinkler also makes it interesting on 8bit platforms. The z80 unpacker included in the release
+is both about twice as fast and smaller than the Shrinkler unpacker.
 
 ## Inspirations:
 
 * Ferris' blog about his [C64 intro packer](https://yupferris.github.io/blog/2020/08/31/c64-4k-intro-packer-deep-dive.html)
 * [Shrinkler](https://github.com/askeksa/Shrinkler)
 * Ryg's [sample rANS implementation](https://github.com/rygorous/ryg_rans)
+
+## Unpackers
+
+The release includes a reference c unpacker, as well as some optimized asm unpackers (arm and riscv). The unpckers in
+c_unpacker and asm_unpackers unpack the default upkr compressed format. The z80_unpacker
+is based on some variations to the compressed format. (Use `upkr --z80` to select those variations.)
+An optimized x86 (DOS) unpacker is currently being worked on out of tree.
+
+## Usage
+
+```
+  upkr [-l level(0-9)] [config options] <infile> [<outfile>]
+  upkr -u [config options] <infile> [<outfile>]
+  upkr --margin [config options] <infile>
+
+ -l, --level N       compression level 0-9
+ -0, ..., -9         short form for setting compression level
+ -u, --unpack        unpack infile
+ --margin            calculate margin for overlapped unpacking of a packed file
+
+Config presets for specific unpackers:
+ --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9
+ --x86               --bitstream --invert-is-match-bit --invert-continue-value-bit --invert-new-offset-bit
+ --x86b              --bitstream --invert-continue-value-bit --no-repeated-offsets -9
+
+Config options (need to match when packing/unpacking):
+ -b, --bitstream     bitstream mode
+ -p, --parity N      use N (2/4) parity contexts
+ -r, --reverse       reverse input & output
+
+Config options to tailor output to specific optimized unpackers:
+ --invert-is-match-bit
+ --invert-new-offset-bit
+ --invert-continue-value-bit
+ --invert-bit-encoding
+ --simplified-prob-update
+ --big-endian-bitstream   (implies --bitstream)
+ --no-repeated-offsets
+ --eof-in-length
+ --max-offset N
+ --max-length N
+```
