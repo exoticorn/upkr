@@ -17,7 +17,7 @@
 upkr_unpack:
     push { r3-r11, lr }
 
-	mov r2, #384
+    mov r2, #384
     mov r3, #128
 .Lclear:
     subs r2, r2, #1
@@ -29,7 +29,7 @@ upkr_unpack:
     bl upkr_decode_bit
     bcc .Ldata
 .Lmatch:
-	mov r5, #256
+    mov r5, #256
     rsbs r6, r4, #0
     blcc upkr_decode_bit
     bcc .Lskip_offset
@@ -39,7 +39,7 @@ upkr_unpack:
     popeq { r3-r11, pc }
 .Lskip_offset:
 
-	mov r5, #256+64
+    mov r5, #256+64
     bl upkr_decode_length
 .Lcopy_loop:
     ldrb r5, [r0, r3]
@@ -55,46 +55,46 @@ upkr_unpack:
 .Ldata_loop:
     bl upkr_decode_bit
     adc r5, r5, r5
-	movs r4, r5, lsr #8
+    movs r4, r5, lsr #8
     beq .Ldata_loop
-	b .Lstore
+    b .Lstore
 
 .type upkr_decode_length, %function
 upkr_decode_length:
-	mov r12, lr
+    mov r12, lr
 
     mov r4, #0
-	mvn r6, #0
+    mvn r6, #0
 .Lbit_loop:
     bl upkr_decode_bit_inc
-	addcc r4, r4, r6
-	movcc pc, r12
+    addcc r4, r4, r6
+    movcc pc, r12
 
     bl upkr_decode_bit_inc
     addcs r4, r4, r6
-	mov r6, r6, lsl #1
+    mov r6, r6, lsl #1
     b .Lbit_loop
 
 .type upkr_decode_bit, %function
 upkr_decode_bit_inc:
-	add r5, r5, #1
+    add r5, r5, #1
 upkr_decode_bit:
-	cmp r2, #4096
-	ldrltb r8, [r1], #1
-	orrlt r2, r8, r2, lsl#8
-	blt upkr_decode_bit
+    cmp r2, #4096
+    ldrltb r8, [r1], #1
+    orrlt r2, r8, r2, lsl#8
+    blt upkr_decode_bit
 
     ldrb r8, [sp, -r5]
-	and r9, r2, #255
-	add r9, r9, #1
-	cmp r8, r9
-	rsbcs r8, r8, #256
-	mvn r9, r2, lsr#8
-	addcs r9, r9, #1
-	mla r2, r8, r9, r2
-	add r9, r8, #8
-	sub r8, r8, r9, lsr#4
-	rsbcs r8, r8, #256
-	strb r8, [sp, -r5]
-	mov pc, r14
+    and r9, r2, #255
+    add r9, r9, #1
+    cmp r8, r9
+    rsbcs r8, r8, #256
+    mvn r9, r2, lsr#8
+    addcs r9, r9, #1
+    mla r2, r8, r9, r2
+    add r9, r8, #8
+    sub r8, r8, r9, lsr#4
+    rsbcs r8, r8, #256
+    strb r8, [sp, -r5]
+    mov pc, r14
 

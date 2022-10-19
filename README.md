@@ -20,7 +20,7 @@ is both about twice as fast and smaller than the Shrinkler unpacker.
 The release includes a reference c unpacker, as well as some optimized asm unpackers (arm and riscv). The unpckers in
 c_unpacker and asm_unpackers unpack the default upkr compressed format. The z80_unpacker
 is based on some variations to the compressed format. (Use `upkr --z80` to select those variations.)
-An optimized x86 (DOS) unpacker is currently being worked on out of tree.
+The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
 
 ## Usage
 
