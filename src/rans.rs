@@ -148,6 +148,7 @@ impl EntropyCoder for CostCounter {
     }
 }
 
+#[derive(Clone)]
 pub struct RansDecoder<'a> {
     data: &'a [u8],
     pos: usize,
@@ -166,8 +167,8 @@ const PROB_MASK: u32 = ONE_PROB - 1;
 pub struct UnexpectedEOF;
 
 impl<'a> RansDecoder<'a> {
-    pub fn new(data: &'a [u8], config: &Config) -> RansDecoder<'a> {
-        RansDecoder {
+    pub fn new(data: &'a [u8], config: &Config) -> Result<RansDecoder<'a>, UnexpectedEOF> {
+        let mut decoder = RansDecoder {
             data,
             pos: 0,
             state: 0,
@@ -176,7 +177,9 @@ impl<'a> RansDecoder<'a> {
             bits_left: 0,
             invert_bit_encoding: config.invert_bit_encoding,
             bitstream_is_big_endian: config.bitstream_is_big_endian,
-        }
+        };
+        decoder.refill()?;
+        Ok(decoder)
     }
 
     pub fn pos(&self) -> usize {
@@ -189,8 +192,7 @@ impl<'a> RansDecoder<'a> {
         Ok(bit)
     }
 
-    pub fn decode_bit(&mut self, prob: u16) -> Result<bool, UnexpectedEOF> {
-        let prob = prob as u32;
+    fn refill(&mut self) -> Result<(), UnexpectedEOF> {
         if self.use_bitstream {
             while self.state < 32768 {
                 if self.bits_left == 0 {
@@ -219,6 +221,13 @@ impl<'a> RansDecoder<'a> {
                 self.pos += 1;
             }
         }
+        Ok(())
+    }
+
+    pub fn decode_bit(&mut self, prob: u16) -> Result<bool, UnexpectedEOF> {
+        self.refill()?;
+
+        let prob = prob as u32;
 
         let bit = (self.state & PROB_MASK) < prob;
 
@@ -230,5 +239,10 @@ impl<'a> RansDecoder<'a> {
         self.state = prob * (self.state >> PROB_BITS) + (self.state & PROB_MASK) - start;
 
         Ok(bit ^ self.invert_bit_encoding)
+    }
+
+    pub fn cost(&self, prev: &RansDecoder) -> f32 {
+        f32::log2(prev.state as f32) - f32::log2(self.state as f32)
+            + (self.pos - prev.pos) as f32 * 8.
     }
 }

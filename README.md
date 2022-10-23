@@ -27,11 +27,13 @@ The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
 ```
   upkr [-l level(0-9)] [config options] <infile> [<outfile>]
   upkr -u [config options] <infile> [<outfile>]
+  upkr --heatmap [config options] <infile> [<outfile>]
   upkr --margin [config options] <infile>
 
  -l, --level N       compression level 0-9
  -0, ..., -9         short form for setting compression level
  -u, --unpack        unpack infile
+ --heatmap           calculate heatmap from compressed file
  --margin            calculate margin for overlapped unpacking of a packed file
 
 Config presets for specific unpackers:
@@ -55,4 +57,14 @@ Config options to tailor output to specific optimized unpackers:
  --eof-in-length
  --max-offset N
  --max-length N
+```
+
+## Heatmap
+
+By default, the `--heatmap` flag writes out the heatmap data as a binary file. The heatmap file is
+the same size as the unpacked data. Each byte can be interpreted like this:
+
+```
+is_literal = byte & 1; // whether the byte was encoded as a literal (as opposed to a match)
+size_in_bits = 2.0 ** (((byte >> 1) - 64) / 8.0); // the size this byte takes up in the compressed data
 ```

@@ -1,4 +1,5 @@
 use crate::context_state::ContextState;
+use crate::heatmap::Heatmap;
 use crate::rans::{EntropyCoder, RansDecoder};
 use crate::Config;
 use thiserror::Error;
@@ -153,21 +154,32 @@ pub fn unpack(
     max_size: usize,
 ) -> Result<Vec<u8>, UnpackError> {
     let mut result = vec![];
-    let _ = unpack_internal(Some(&mut result), packed_data, config, max_size)?;
+    let _ = unpack_internal(Some(&mut result), None, packed_data, config, max_size)?;
     Ok(result)
 }
 
 pub fn calculate_margin(packed_data: &[u8], config: &Config) -> Result<isize, UnpackError> {
-    unpack_internal(None, packed_data, config, usize::MAX)
+    unpack_internal(None, None, packed_data, config, usize::MAX)
 }
 
-pub fn unpack_internal(
+pub fn create_heatmap(
+    packed_data: &[u8],
+    config: &Config,
+    max_size: usize,
+) -> Result<Heatmap, UnpackError> {
+    let mut heatmap = Heatmap::new();
+    let _ = unpack_internal(None, Some(&mut heatmap), packed_data, config, max_size)?;
+    Ok(heatmap)
+}
+
+fn unpack_internal(
     mut result: Option<&mut Vec<u8>>,
+    mut heatmap: Option<&mut Heatmap>,
     packed_data: &[u8],
     config: &Config,
     max_size: usize,
 ) -> Result<isize, UnpackError> {
-    let mut decoder = RansDecoder::new(packed_data, &config);
+    let mut decoder = RansDecoder::new(packed_data, &config)?;
     let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, &config);
     let mut offset = usize::MAX;
     let mut position = 0usize;
@@ -198,6 +210,7 @@ pub fn unpack_internal(
     }
 
     loop {
+        let prev_decoder = decoder.clone();
         margin = margin.max(position as isize - decoder.pos() as isize);
         let literal_base = position % config.parity_contexts * 256;
         if decoder.decode_with_context(&mut contexts.context_mut(literal_base))?
@@ -231,6 +244,9 @@ pub fn unpack_internal(
             if offset > position {
                 return Err(UnpackError::OffsetOutOfRange { offset, position });
             }
+            if let Some(ref mut heatmap) = heatmap {
+                heatmap.add_match(offset, length, decoder.cost(&prev_decoder));
+            }
             if let Some(ref mut result) = result {
                 for _ in 0..length {
                     if result.len() < max_size {
@@ -251,6 +267,9 @@ pub fn unpack_internal(
                 context_index = (context_index << 1) | bit as usize;
                 byte |= (bit as u8) << i;
             }
+            if let Some(ref mut heatmap) = heatmap {
+                heatmap.add_literal(byte, decoder.cost(&prev_decoder));
+            }
             if let Some(ref mut result) = result {
                 if result.len() < max_size {
                     result.push(byte);
@@ -259,6 +278,10 @@ pub fn unpack_internal(
             position += 1;
             prev_was_match = false;
         }
+    }
+
+    if let Some(heatmap) = heatmap {
+        heatmap.finish();
     }
 
     if position > max_size {

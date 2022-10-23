@@ -1,11 +1,13 @@
 mod context_state;
 mod greedy_packer;
+mod heatmap;
 mod lz;
 mod match_finder;
 mod parsing_packer;
 mod rans;
 
-pub use lz::{calculate_margin, unpack, UnpackError};
+pub use heatmap::Heatmap;
+pub use lz::{calculate_margin, create_heatmap, unpack, UnpackError};
 
 pub type ProgressCallback<'a> = &'a mut dyn FnMut(usize);
 
