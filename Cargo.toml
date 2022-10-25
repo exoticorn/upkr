@@ -12,5 +12,4 @@ lexopt = "0.2.1"
 anyhow = "1"
 thiserror = "1.0.36"
 pbr = "1"
-crossterm = { version = "0.25.0", default-features = false }
-terminal = { version = "0.2.1", default-features = false, features = ["crossterm-backend"] }
+crossterm = { version = "0.25.0", default-features = false, optional = true }

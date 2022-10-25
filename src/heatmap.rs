@@ -72,6 +72,7 @@ impl Heatmap {
         self.data[index]
     }
 
+    #[cfg(feature = "crossterm")]
     pub fn print_as_hex(&self) -> std::io::Result<()> {
         use crossterm::{
             style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor},

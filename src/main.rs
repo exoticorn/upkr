@@ -10,6 +10,7 @@ fn main() -> Result<()> {
     let mut unpack = false;
     let mut calculate_margin = false;
     let mut create_heatmap = false;
+    #[allow(unused_mut)]
     let mut do_hexdump = false;
     let mut level = 2;
     let mut infile: Option<PathBuf> = None;
@@ -61,6 +62,7 @@ fn main() -> Result<()> {
             Short('u') | Long("unpack") => unpack = true,
             Long("margin") => calculate_margin = true,
             Long("heatmap") => create_heatmap = true,
+            #[cfg(feature = "crossterm")]
             Long("hexdump") => do_hexdump = true,
             Short('l') | Long("level") => level = parser.value()?.parse()?,
             Short(n) if n.is_ascii_digit() => level = n as u8 - b'0',
@@ -162,18 +164,20 @@ fn main() -> Result<()> {
             if reverse {
                 heatmap.reverse();
             }
-            if do_hexdump {
-                heatmap.print_as_hex()?;
-            } else {
-                let mut heatmap_bin = Vec::with_capacity(heatmap.len());
-                for i in 0..heatmap.len() {
-                    let cost = (heatmap.cost(i).log2() * 8. + 64.)
-                        .round()
-                        .max(0.)
-                        .min(127.) as u8;
-                    heatmap_bin.push((cost << 1) | heatmap.is_literal(i) as u8);
+            match do_hexdump {
+                #[cfg(feature = "crossterm")]
+                true => heatmap.print_as_hex()?,
+                _ => {
+                    let mut heatmap_bin = Vec::with_capacity(heatmap.len());
+                    for i in 0..heatmap.len() {
+                        let cost = (heatmap.cost(i).log2() * 8. + 64.)
+                            .round()
+                            .max(0.)
+                            .min(127.) as u8;
+                        heatmap_bin.push((cost << 1) | heatmap.is_literal(i) as u8);
+                    }
+                    File::create(outfile(OutFileType::Heatmap))?.write_all(&heatmap_bin)?;
                 }
-                File::create(outfile(OutFileType::Heatmap))?.write_all(&heatmap_bin)?;
             }
         }
         if calculate_margin {
