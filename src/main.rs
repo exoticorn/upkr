@@ -123,17 +123,23 @@ fn main() -> Result<()> {
             data.reverse();
         }
 
-        let mut pb = pbr::ProgressBar::new(data.len() as u64);
-        pb.set_units(pbr::Units::Bytes);
-        let mut packed_data = upkr::pack(
-            &data,
-            level,
-            &config,
-            Some(&mut |pos| {
-                pb.set(pos as u64);
-            }),
-        );
-        pb.finish();
+        #[cfg(feature = "terminal")]
+        let mut packed_data = {
+            let mut pb = pbr::ProgressBar::new(data.len() as u64);
+            pb.set_units(pbr::Units::Bytes);
+            let packed_data = upkr::pack(
+                &data,
+                level,
+                &config,
+                Some(&mut |pos| {
+                    pb.set(pos as u64);
+                }),
+            );
+            pb.finish();
+            packed_data
+        };
+        #[cfg(not(feature = "terminal"))]
+        let mut packed_data = upkr::pack(&data, level, &config, None);
 
         if reverse {
             packed_data.reverse();

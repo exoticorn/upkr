@@ -23,12 +23,12 @@ upkr-windows-$(VERSION).zip: upkr-windows/upkr.exe PHONY
 	zip -r -9 $@ upkr-windows
 
 upkr-linux/upkr:
-	cargo build --target x86_64-unknown-linux-musl --release -F crossterm
+	cargo build --target x86_64-unknown-linux-musl --release -F terminal
 	mkdir -p upkr-linux
 	cp ../target/x86_64-unknown-linux-musl/release/upkr upkr-linux/
 
 upkr-windows/upkr.exe:
-	cargo build --target x86_64-pc-windows-gnu --release -F crossterm
+	cargo build --target x86_64-pc-windows-gnu --release -F terminal
 	mkdir -p upkr-windows
 	cp ../target/x86_64-pc-windows-gnu/release/upkr.exe upkr-windows/
 	

@@ -1,3 +1,14 @@
+/// Heatmap information about a compressed block of data.
+///
+/// For each byte in the uncompressed data, the heatmap provides two pieces of intormation:
+/// 1. whether this byte was encoded as a literal or as part of a match
+/// 2. how many (fractional) bits where spend on encoding this byte
+///
+/// For the sake of the heatmap, the cost of literals are spread out across all matches
+/// that reference the literal.
+///
+/// If the `terminal` feature is enabled, there is a function to write out the
+/// heatmap as a colored hexdump.
 pub struct Heatmap {
     data: Vec<u8>,
     cost: Vec<f32>,
@@ -5,7 +16,7 @@ pub struct Heatmap {
 }
 
 impl Heatmap {
-    pub fn new() -> Heatmap {
+    pub(crate) fn new() -> Heatmap {
         Heatmap {
             data: Vec::new(),
             cost: Vec::new(),
@@ -13,13 +24,13 @@ impl Heatmap {
         }
     }
 
-    pub fn add_literal(&mut self, byte: u8, cost: f32) {
+    pub(crate) fn add_literal(&mut self, byte: u8, cost: f32) {
         self.data.push(byte);
         self.cost.push(cost);
         self.literal_index.push(self.literal_index.len());
     }
 
-    pub fn add_match(&mut self, offset: usize, length: usize, mut cost: f32) {
+    pub(crate) fn add_match(&mut self, offset: usize, length: usize, mut cost: f32) {
         cost /= length as f32;
         for _ in 0..length {
             self.data.push(self.data[self.data.len() - offset]);
@@ -29,7 +40,7 @@ impl Heatmap {
         }
     }
 
-    pub fn finish(&mut self) {
+    pub(crate) fn finish(&mut self) {
         let mut ref_count = vec![0usize; self.literal_index.len()];
         for &index in &self.literal_index {
             ref_count[index] += 1;
@@ -47,6 +58,7 @@ impl Heatmap {
         }
     }
 
+    /// Reverses the heatmap
     pub fn reverse(&mut self) {
         self.data.reverse();
         self.cost.reverse();
@@ -56,23 +68,28 @@ impl Heatmap {
         }
     }
 
+    /// The number of (uncompressed) bytes of data in this heatmap
     pub fn len(&self) -> usize {
         self.cost.len()
     }
 
+    /// Returns whether the byte at `index` was encoded as a literal
     pub fn is_literal(&self, index: usize) -> bool {
         self.literal_index[index] == index
     }
 
+    /// Returns the cost of encoding the byte at `index` in (fractional) bits
     pub fn cost(&self, index: usize) -> f32 {
         self.cost[index]
     }
 
+    /// Returns the uncompressed data byte at `index`
     pub fn byte(&self, index: usize) -> u8 {
         self.data[index]
     }
 
     #[cfg(feature = "crossterm")]
+    /// Print the heatmap as a colored hexdump
     pub fn print_as_hex(&self) -> std::io::Result<()> {
         use crossterm::{
             style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor},

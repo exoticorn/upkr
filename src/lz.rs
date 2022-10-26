@@ -133,21 +133,47 @@ impl CoderState {
     }
 }
 
+/// The error type for the uncompressing related functions
 #[derive(Error, Debug)]
 pub enum UnpackError {
+    /// a match offset pointing beyond the start of the unpacked data was encountered
     #[error("match offset out of range: {offset} > {position}")]
-    OffsetOutOfRange { offset: usize, position: usize },
+    OffsetOutOfRange {
+        /// the match offset
+        offset: usize,
+        /// the current position in the uncompressed stream
+        position: usize,
+    },
+    /// The passed size limit was exceeded
     #[error("Unpacked data over size limit: {size} > {limit}")]
-    OverSize { size: usize, limit: usize },
+    OverSize {
+        /// the size of the uncompressed data
+        size: usize,
+        /// the size limit passed into the function
+        limit: usize,
+    },
+    /// The end of the packed data was reached without an encoded EOF marker
     #[error("Unexpected end of input data")]
     UnexpectedEOF {
         #[from]
+        /// the underlying EOF error in the rANS decoder
         source: crate::rans::UnexpectedEOF,
     },
+    /// An offset or length value was found that exceeded 32bit
     #[error("Overflow while reading value")]
     ValueOverflow,
 }
 
+/// Uncompress a piece of compressed data
+///
+/// Returns either the uncompressed data, or an `UnpackError`
+///
+/// # Parameters
+///
+/// - `packed_data`: the compressed data
+/// - `config`: the exact compression format config used to compress the data
+/// - `max_size`: the maximum size of uncompressed data to return. When this is exceeded,
+///   `UnpackError::OverSize` is returned
 pub fn unpack(
     packed_data: &[u8],
     config: &Config,
@@ -158,10 +184,22 @@ pub fn unpack(
     Ok(result)
 }
 
+/// Calculates the minimum margin when overlapping buffers.
+///
+/// Returns the minimum margin needed between the end of the compressed data and the
+/// end of the uncompressed data when overlapping the two buffers to save on RAM.
 pub fn calculate_margin(packed_data: &[u8], config: &Config) -> Result<isize, UnpackError> {
     unpack_internal(None, None, packed_data, config, usize::MAX)
 }
 
+/// Calculates a `Heatmap` from compressed data.
+///
+/// # Parameters
+///
+/// - `packed_data`: the compressed data
+/// - `config`: the exact compression format config used to compress the data
+/// - `max_size`: the maximum size of the heatmap to return. When this is exceeded,
+///   `UnpackError::OverSize` is returned
 pub fn create_heatmap(
     packed_data: &[u8],
     config: &Config,
