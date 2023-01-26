@@ -105,15 +105,14 @@ upkr_decode_bit:
     dec     dx
     jns     upkr_load_bit
     movzx   ax, byte [bx]   ; u16 prob = upkr_probs[context_index]
+    neg     byte [bx]
     push    ax              ; save prob, tmp = prob
     cmp     dl, al          ; int bit = (upkr_state & 255) < prob ? 1 : 0; (carry = bit)
     pushf                   ; save bit flags
     jc      .bit            ; (skip if bit)
-    neg     al              ;   tmp = 256 - tmp;
+    xchg    [bx], al        ;   tmp = 256 - tmp;
 .bit:
-    mov     [bx], al        ; upkr_probs[context_index] = tmp + (256 - tmp + 8) >> 4;
-    neg     byte [bx]
-    shr     byte [bx], 4
+    shr     byte [bx], 4    ; upkr_probs[context_index] = tmp + (256 - tmp + 8) >> 4;
     adc     [bx], al
     mul     dh              ; upkr_state = tmp * (upkr_state >> 8) + (upkr_state & 255);
     mov     dh, 0
