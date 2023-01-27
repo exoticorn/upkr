@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 //! Compression and decompression of the upkr format and variants.
 //!
