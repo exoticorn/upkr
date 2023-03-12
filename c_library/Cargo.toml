@@ -1,0 +1,17 @@
+[package]
+name = "upkr_c"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "upkr"
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = "s"
+strip = "debuginfo"
+lto = true
+panic = "abort"
+
+[dependencies]
+upkr = { path="..", default-features=false }
