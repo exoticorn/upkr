@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             Short(n) if n.is_ascii_digit() => level = n as u8 - b'0',
             Short('h') | Long("help") => print_help(0),
             Long("version") => {
-                println!("{}", env!("CARGO_PKG_VERSION"));
+                eprintln!("{}", env!("CARGO_PKG_VERSION"));
                 process::exit(0);
             }
             Long("max-unpacked-size") => max_unpacked_size = parser.value()?.parse()?,
@@ -78,38 +78,8 @@ fn main() -> Result<()> {
         }
     }
 
-    let infile = infile.unwrap_or_else(|| print_help(1));
-    enum OutFileType {
-        Packed,
-        Unpacked,
-        Heatmap,
-    }
-    let outfile = |tpe: OutFileType| {
-        outfile.clone().unwrap_or_else(|| {
-            let mut name = infile.clone();
-            match tpe {
-                OutFileType::Packed => {
-                    let mut filename = name
-                        .file_name()
-                        .unwrap_or_else(|| OsStr::new(""))
-                        .to_os_string();
-                    filename.push(".upk");
-                    name.set_file_name(filename);
-                }
-                OutFileType::Unpacked => {
-                    if name.extension().filter(|&e| e == "upk").is_some() {
-                        name.set_extension("");
-                    } else {
-                        name.set_extension("bin");
-                    }
-                }
-                OutFileType::Heatmap => {
-                    name.set_extension("heatmap");
-                }
-            }
-            name
-        })
-    };
+    let infile = IoTarget::from_filename(infile);
+    let outfile = |tpe: OutFileType| infile.output(tpe, &outfile);
 
     if config.parity_contexts != 1 && config.parity_contexts != 2 && config.parity_contexts != 4 {
         eprintln!("--parity has to be 1, 2, or 4");
@@ -117,8 +87,7 @@ fn main() -> Result<()> {
     }
 
     if !unpack && !calculate_margin && !create_heatmap {
-        let mut data = vec![];
-        File::open(&infile)?.read_to_end(&mut data)?;
+        let mut data = infile.read()?;
         if reverse {
             data.reverse();
         }
@@ -145,16 +114,15 @@ fn main() -> Result<()> {
             packed_data.reverse();
         }
 
-        println!(
+        eprintln!(
             "Compressed {} bytes to {} bytes ({}%)",
             data.len(),
             packed_data.len(),
             packed_data.len() as f32 * 100. / data.len() as f32
         );
-        File::create(outfile(OutFileType::Packed))?.write_all(&packed_data)?;
+        outfile(OutFileType::Packed).write(&packed_data)?;
     } else {
-        let mut data = vec![];
-        File::open(&infile)?.read_to_end(&mut data)?;
+        let mut data = infile.read()?;
         if reverse {
             data.reverse();
         }
@@ -163,7 +131,7 @@ fn main() -> Result<()> {
             if reverse {
                 unpacked_data.reverse();
             }
-            File::create(outfile(OutFileType::Unpacked))?.write_all(&unpacked_data)?;
+            outfile(OutFileType::Unpacked).write(&unpacked_data)?;
         }
         if create_heatmap {
             let mut heatmap = upkr::create_heatmap(&data, &config, max_unpacked_size)?;
@@ -182,7 +150,7 @@ fn main() -> Result<()> {
                             .min(127.) as u8;
                         heatmap_bin.push((cost << 1) | heatmap.is_literal(i) as u8);
                     }
-                    File::create(outfile(OutFileType::Heatmap))?.write_all(&heatmap_bin)?;
+                    outfile(OutFileType::Heatmap).write(&heatmap_bin)?;
                 }
             }
         }
@@ -192,6 +160,81 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+enum OutFileType {
+    Packed,
+    Unpacked,
+    Heatmap,
+}
+
+enum IoTarget {
+    StdInOut,
+    File(PathBuf),
+}
+
+impl IoTarget {
+    fn from_filename(filename: Option<PathBuf>) -> IoTarget {
+        if let Some(path) = filename {
+            if path.as_os_str() == "-" {
+                IoTarget::StdInOut
+            } else {
+                IoTarget::File(path)
+            }
+        } else {
+            IoTarget::StdInOut
+        }
+    }
+
+    fn read(&self) -> Result<Vec<u8>> {
+        let mut buffer = vec![];
+        match *self {
+            IoTarget::StdInOut => std::io::stdin().read_to_end(&mut buffer)?,
+            IoTarget::File(ref path) => File::open(path)?.read_to_end(&mut buffer)?,
+        };
+        Ok(buffer)
+    }
+
+    fn write(&self, data: &[u8]) -> Result<()> {
+        match *self {
+            IoTarget::StdInOut => std::io::stdout().write_all(data)?,
+            IoTarget::File(ref path) => File::create(path)?.write_all(data)?,
+        };
+        Ok(())
+    }
+
+    fn output(&self, tpe: OutFileType, outname: &Option<PathBuf>) -> IoTarget {
+        if outname.is_some() {
+            return IoTarget::from_filename(outname.clone());
+        }
+        match *self {
+            IoTarget::StdInOut => IoTarget::StdInOut,
+            IoTarget::File(ref path) => {
+                let mut name = path.clone();
+                match tpe {
+                    OutFileType::Packed => {
+                        let mut filename = name
+                            .file_name()
+                            .unwrap_or_else(|| OsStr::new(""))
+                            .to_os_string();
+                        filename.push(".upk");
+                        name.set_file_name(filename);
+                    }
+                    OutFileType::Unpacked => {
+                        if name.extension().filter(|&e| e == "upk").is_some() {
+                            name.set_extension("");
+                        } else {
+                            name.set_extension("bin");
+                        }
+                    }
+                    OutFileType::Heatmap => {
+                        name.set_extension("heatmap");
+                    }
+                }
+                IoTarget::File(name)
+            }
+        }
+    }
 }
 
 fn print_help(exit_code: i32) -> ! {
@@ -206,6 +249,11 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" -u, --unpack        unpack infile");
     eprintln!(" --heatmap           calculate heatmap from compressed file");
     eprintln!(" --margin            calculate margin for overlapped unpacking of a packed file");
+    eprintln!();
+    eprintln!("When no infile is given, or the infile is '-', read from stdin.");
+    eprintln!(
+        "When no outfile is given and reading from stdin, or when outfile is '-', write to stdout."
+    );
     eprintln!();
     eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
     eprintln!();
