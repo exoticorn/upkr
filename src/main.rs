@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             Short(n) if n.is_ascii_digit() => level = n as u8 - b'0',
             Short('h') | Long("help") => print_help(0),
             Long("version") => {
-                eprintln!("{}", env!("CARGO_PKG_VERSION"));
+                println!("{}", env!("CARGO_PKG_VERSION"));
                 process::exit(0);
             }
             Long("max-unpacked-size") => max_unpacked_size = parser.value()?.parse()?,

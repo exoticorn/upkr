@@ -26,10 +26,12 @@ upkr-linux/upkr:
 	cargo build --target x86_64-unknown-linux-musl --release -F terminal
 	mkdir -p upkr-linux
 	cp ../target/x86_64-unknown-linux-musl/release/upkr upkr-linux/
+	strip upkr-linux/upkr
 
 upkr-windows/upkr.exe:
 	cargo build --target x86_64-pc-windows-gnu --release -F terminal
 	mkdir -p upkr-windows
 	cp ../target/x86_64-pc-windows-gnu/release/upkr.exe upkr-windows/
+	x86_64-w64-mingw32-strip upkr-windows/upkr.exe
 	
 PHONY:
