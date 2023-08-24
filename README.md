@@ -22,6 +22,12 @@ c_unpacker and asm_unpackers unpack the default upkr compressed format. The z80_
 is based on some variations to the compressed format. (Use `upkr --z80` to select those variations.)
 The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
 
+### More unpackers outside this repository
+
+* [Atari Lynx](https://github.com/42Bastian/new_bll/blob/master/demos/depacker/unupkr.asm)
+* [Atari Jaguar](https://github.com/42Bastian/new_bjl/blob/main/exp/depacker/unupkr.js)
+* [8080, R800](https://github.com/ivagorRetrocomp/DeUpkr)
+
 ## Usage
 
 ```
@@ -32,9 +38,12 @@ The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
 
  -l, --level N       compression level 0-9
  -0, ..., -9         short form for setting compression level
- -u, --unpack        unpack infile
+ -d, --decompress    decompress infile
  --heatmap           calculate heatmap from compressed file
  --margin            calculate margin for overlapped unpacking of a packed file
+
+When no infile is given, or the infile is '-', read from stdin.
+When no outfile is given and reading from stdin, or when outfile is '-', write to stdout.
 
 Config presets for specific unpackers:
  --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9

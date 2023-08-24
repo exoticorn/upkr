@@ -59,7 +59,7 @@ fn main() -> Result<()> {
                 level = 9;
             }
 
-            Short('u') | Long("unpack") => unpack = true,
+            Short('u') | Long("unpack") | Short('d') | Long("decompress") => unpack = true,
             Long("margin") => calculate_margin = true,
             Long("heatmap") => create_heatmap = true,
             #[cfg(feature = "crossterm")]
@@ -94,7 +94,7 @@ fn main() -> Result<()> {
 
         #[cfg(feature = "terminal")]
         let mut packed_data = {
-            let mut pb = pbr::ProgressBar::new(data.len() as u64);
+            let mut pb = pbr::ProgressBar::on(std::io::stderr(), data.len() as u64);
             pb.set_units(pbr::Units::Bytes);
             let packed_data = upkr::pack(
                 &data,
@@ -105,6 +105,7 @@ fn main() -> Result<()> {
                 }),
             );
             pb.finish();
+            eprintln!();
             packed_data
         };
         #[cfg(not(feature = "terminal"))]
@@ -246,7 +247,7 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!();
     eprintln!(" -l, --level N       compression level 0-9");
     eprintln!(" -0, ..., -9         short form for setting compression level");
-    eprintln!(" -u, --unpack        unpack infile");
+    eprintln!(" -d, --decompress    decompress infile");
     eprintln!(" --heatmap           calculate heatmap from compressed file");
     eprintln!(" --margin            calculate margin for overlapped unpacking of a packed file");
     eprintln!();
