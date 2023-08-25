@@ -40,6 +40,10 @@ The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
  -0, ..., -9         short form for setting compression level
  -d, --decompress    decompress infile
  --heatmap           calculate heatmap from compressed file
+   --raw-cost        report raw cost of literals in heatmap
+                     (the cost of literals is spread across all matches
+                     that reference the literal by default.)
+   --hexdump         print heatmap as colored hexdump
  --margin            calculate margin for overlapped unpacking of a packed file
 
 When no infile is given, or the infile is '-', read from stdin.

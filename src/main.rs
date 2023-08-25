@@ -259,6 +259,9 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!(" -0, ..., -9         short form for setting compression level");
     eprintln!(" -d, --decompress    decompress infile");
     eprintln!(" --heatmap           calculate heatmap from compressed file");
+    eprintln!("   --raw-cost        report raw cost of literals in heatmap");
+    #[cfg(feature = "crossterm")]
+    eprintln!("   --hexdump         print heatmap as colored hexdump");
     eprintln!(" --margin            calculate margin for overlapped unpacking of a packed file");
     eprintln!();
     eprintln!("When no infile is given, or the infile is '-', read from stdin.");
