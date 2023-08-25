@@ -10,6 +10,7 @@ fn main() -> Result<()> {
     let mut unpack = false;
     let mut calculate_margin = false;
     let mut create_heatmap = false;
+    let mut report_raw_cost = false;
     #[allow(unused_mut)]
     let mut do_hexdump = false;
     let mut level = 2;
@@ -62,6 +63,7 @@ fn main() -> Result<()> {
             Short('u') | Long("unpack") | Short('d') | Long("decompress") => unpack = true,
             Long("margin") => calculate_margin = true,
             Long("heatmap") => create_heatmap = true,
+            Long("raw-cost") => report_raw_cost = true,
             #[cfg(feature = "crossterm")]
             Long("hexdump") => do_hexdump = true,
             Short('l') | Long("level") => level = parser.value()?.parse()?,
@@ -141,14 +143,22 @@ fn main() -> Result<()> {
             }
             match do_hexdump {
                 #[cfg(feature = "crossterm")]
-                true => heatmap.print_as_hex()?,
+                true => {
+                    if report_raw_cost {
+                        heatmap.print_as_hex_raw_cost()?
+                    } else {
+                        heatmap.print_as_hex()?
+                    }
+                }
                 _ => {
                     let mut heatmap_bin = Vec::with_capacity(heatmap.len());
                     for i in 0..heatmap.len() {
-                        let cost = (heatmap.cost(i).log2() * 8. + 64.)
-                            .round()
-                            .max(0.)
-                            .min(127.) as u8;
+                        let cost = if report_raw_cost {
+                            heatmap.raw_cost(i)
+                        } else {
+                            heatmap.cost(i)
+                        };
+                        let cost = (cost.log2() * 8. + 64.).round().max(0.).min(127.) as u8;
                         heatmap_bin.push((cost << 1) | heatmap.is_literal(i) as u8);
                     }
                     outfile(OutFileType::Heatmap).write(&heatmap_bin)?;

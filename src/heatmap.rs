@@ -12,6 +12,7 @@
 pub struct Heatmap {
     data: Vec<u8>,
     cost: Vec<f32>,
+    raw_cost: Vec<f32>,
     literal_index: Vec<usize>,
 }
 
@@ -20,6 +21,7 @@ impl Heatmap {
         Heatmap {
             data: Vec::new(),
             cost: Vec::new(),
+            raw_cost: Vec::new(),
             literal_index: Vec::new(),
         }
     }
@@ -41,6 +43,8 @@ impl Heatmap {
     }
 
     pub(crate) fn finish(&mut self) {
+        self.raw_cost = self.cost.clone();
+
         let mut ref_count = vec![0usize; self.literal_index.len()];
         for &index in &self.literal_index {
             ref_count[index] += 1;
@@ -78,9 +82,16 @@ impl Heatmap {
         self.literal_index[index] == index
     }
 
-    /// Returns the cost of encoding the byte at `index` in (fractional) bits
+    /// Returns the cost of encoding the byte at `index` in (fractional) bits.
+    /// The cost of literal bytes is spread across the matches that reference it.
+    /// See `raw_cost` for the raw encoding cost of each byte.
     pub fn cost(&self, index: usize) -> f32 {
         self.cost[index]
+    }
+
+    /// Returns the raw cost of encoding the byte at `index` in (fractional) bits
+    pub fn raw_cost(&self, index: usize) -> f32 {
+        self.raw_cost[index]
     }
 
     /// Returns the uncompressed data byte at `index`
@@ -91,6 +102,17 @@ impl Heatmap {
     #[cfg(feature = "crossterm")]
     /// Print the heatmap as a colored hexdump
     pub fn print_as_hex(&self) -> std::io::Result<()> {
+        self.print_as_hex_internal(false)
+    }
+
+    #[cfg(feature = "crossterm")]
+    /// Print the heatmap as a colored hexdump, based on `raw_cost`.
+    pub fn print_as_hex_raw_cost(&self) -> std::io::Result<()> {
+        self.print_as_hex_internal(true)
+    }
+
+    #[cfg(feature = "crossterm")]
+    fn print_as_hex_internal(&self, report_raw_cost: bool) -> std::io::Result<()> {
         use crossterm::{
             style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor},
             QueueableCommand,
@@ -102,8 +124,13 @@ impl Heatmap {
             heatmap: &Heatmap,
             index: usize,
             num_colors: u16,
+            report_raw_cost: bool,
         ) -> std::io::Result<()> {
-            let cost = heatmap.cost(index);
+            let cost = if report_raw_cost {
+                heatmap.raw_cost(index)
+            } else {
+                heatmap.cost(index)
+            };
             if num_colors < 256 {
                 let colors = [
                     Color::Red,
@@ -149,7 +176,7 @@ impl Heatmap {
             stdout.queue(Print(&format!("{:04x}  ", row_start)))?;
 
             for i in row_range.clone() {
-                set_color(&mut stdout, self, i, num_colors)?;
+                set_color(&mut stdout, self, i, num_colors, report_raw_cost)?;
                 stdout.queue(Print(&format!("{:02x} ", self.data[i])))?;
             }
 
@@ -160,7 +187,7 @@ impl Heatmap {
                 .queue(Print(&gap))?;
 
             for i in row_range.clone() {
-                set_color(&mut stdout, self, i, num_colors)?;
+                set_color(&mut stdout, self, i, num_colors, report_raw_cost)?;
                 let byte = self.data[i];
                 if byte >= 32 && byte < 127 {
                     stdout.queue(Print(format!("{}", byte as char)))?;
