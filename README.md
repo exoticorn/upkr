@@ -27,6 +27,7 @@ The 16 bit dos unpacker also uses some variations. (`upkr --x86`)
 * [Atari Lynx](https://github.com/42Bastian/new_bll/blob/master/demos/depacker/unupkr.asm)
 * [Atari Jaguar](https://github.com/42Bastian/new_bjl/blob/main/exp/depacker/unupkr.js)
 * [8080, R800](https://github.com/ivagorRetrocomp/DeUpkr)
+* [6502](https://github.com/pfusik/upkr6502)
 
 ## Usage
 
