@@ -71,6 +71,9 @@ pub struct Config {
     pub max_offset: usize,
     /// The maximum match length value to encode when compressing.
     pub max_length: usize,
+
+    /// Size of dictionary at the beginning of data (how many bytes to skip when compressing.)
+    pub dictionary_size: usize,
 }
 
 impl Default for Config {
@@ -92,6 +95,8 @@ impl Default for Config {
 
             max_offset: usize::MAX,
             max_length: usize::MAX,
+
+            dictionary_size: 0,
         }
     }
 }

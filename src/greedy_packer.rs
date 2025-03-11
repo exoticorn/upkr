@@ -12,7 +12,7 @@ pub fn pack(
     let mut rans_coder = RansCoder::new(config);
     let mut state = lz::CoderState::new(config);
 
-    let mut pos = 0;
+    let mut pos = config.dictionary_size;
     while pos < data.len() {
         if let Some(ref mut cb) = progress_callback {
             cb(pos);

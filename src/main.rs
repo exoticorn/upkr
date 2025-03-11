@@ -16,6 +16,7 @@ fn main() -> Result<()> {
     let mut level = 2;
     let mut infile: Option<PathBuf> = None;
     let mut outfile: Option<PathBuf> = None;
+    let mut dictionary: Option<PathBuf> = None;
     let mut max_unpacked_size = 512 * 1024 * 1024;
 
     let mut parser = lexopt::Parser::from_env();
@@ -74,6 +75,7 @@ fn main() -> Result<()> {
                 process::exit(0);
             }
             Long("max-unpacked-size") => max_unpacked_size = parser.value()?.parse()?,
+            Long("dictionary") => dictionary = Some(parser.value()?.try_into()?),
             Value(val) if infile.is_none() => infile = Some(val.try_into()?),
             Value(val) if outfile.is_none() => outfile = Some(val.try_into()?),
             _ => return Err(arg.unexpected().into()),
@@ -92,6 +94,15 @@ fn main() -> Result<()> {
         let mut data = infile.read()?;
         if reverse {
             data.reverse();
+        }
+
+        if let Some(dictionary) = dictionary {
+            let mut dict = vec![];
+            File::open(dictionary)?.read_to_end(&mut dict)?;
+            config.dictionary_size = dict.len();
+            // prepend dict
+            dict.append(&mut data);
+            data = dict;
         }
 
         #[cfg(feature = "terminal")]

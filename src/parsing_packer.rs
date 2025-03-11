@@ -137,7 +137,7 @@ fn parse(
     }
     add_arrival(
         &mut arrivals,
-        0,
+        encoding_config.dictionary_size,
         Arrival {
             parse: None,
             state: lz::CoderState::new(encoding_config),
@@ -148,7 +148,7 @@ fn parse(
 
     let cost_counter = &mut CostCounter::new(encoding_config);
     let mut best_per_offset = HashMap::new();
-    for pos in 0..data.len() {
+    for pos in encoding_config.dictionary_size..data.len() {
         let match_length = |offset: usize| {
             data[pos..]
                 .iter()
