@@ -23,6 +23,13 @@ build/unpack_riscv32.o: unpack_riscv.S
 build/unpack_riscv32.bin: build/unpack_riscv32.o
 	riscv64-linux-gnu-objcopy -O binary --only-section=.text $? $@
 
+build/unpack_riscv32nc.o: unpack_riscv.S
+	mkdir -p build
+	riscv64-linux-gnu-gcc -march=rv32im -mabi=ilp32 -c -o $@ $?
+	
+build/unpack_riscv32nc.bin: build/unpack_riscv32nc.o
+	riscv64-linux-gnu-objcopy -O binary --only-section=.text $? $@
+
 disas-riscv32: build/unpack_riscv32.o
 	riscv64-linux-gnu-objdump -d $?
 

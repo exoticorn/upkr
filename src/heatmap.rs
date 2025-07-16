@@ -77,6 +77,11 @@ impl Heatmap {
         self.cost.len()
     }
 
+    /// Returns whether the heatmap data is empty
+    pub fn is_empty(&self) -> bool {
+        self.cost.is_empty()
+    }
+
     /// Returns whether the byte at `index` was encoded as a literal
     pub fn is_literal(&self, index: usize) -> bool {
         self.literal_index[index] == index
@@ -114,10 +119,10 @@ impl Heatmap {
     #[cfg(feature = "crossterm")]
     fn print_as_hex_internal(&self, report_raw_cost: bool) -> std::io::Result<()> {
         use crossterm::{
-            style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor},
             QueueableCommand,
+            style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor},
         };
-        use std::io::{stdout, Write};
+        use std::io::{Write, stdout};
 
         fn set_color(
             mut out: impl QueueableCommand,

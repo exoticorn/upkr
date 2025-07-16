@@ -1,6 +1,6 @@
 use crate::{
-    rans::{ONE_PROB, PROB_BITS},
     Config,
+    rans::{ONE_PROB, PROB_BITS},
 };
 
 const INIT_PROB: u16 = 1 << (PROB_BITS - 1);
@@ -49,12 +49,10 @@ impl<'a> Context<'a> {
             };
 
             (offset + old as i32 - ((old as i32 + UPDATE_ADD as i32) >> UPDATE_RATE)) as u8
+        } else if bit ^ self.state.invert_bit_encoding {
+            old + ((ONE_PROB - old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
         } else {
-            if bit ^ self.state.invert_bit_encoding {
-                old + ((ONE_PROB - old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
-            } else {
-                old - ((old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
-            }
+            old - ((old as u32 + UPDATE_ADD) >> UPDATE_RATE) as u8
         };
     }
 }

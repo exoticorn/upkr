@@ -74,8 +74,8 @@ fn main() -> Result<()> {
                 process::exit(0);
             }
             Long("max-unpacked-size") => max_unpacked_size = parser.value()?.parse()?,
-            Value(val) if infile.is_none() => infile = Some(val.try_into()?),
-            Value(val) if outfile.is_none() => outfile = Some(val.try_into()?),
+            Value(val) if infile.is_none() => infile = Some(val.into()),
+            Value(val) if outfile.is_none() => outfile = Some(val.into()),
             _ => return Err(arg.unexpected().into()),
         }
     }
@@ -158,7 +158,7 @@ fn main() -> Result<()> {
                         } else {
                             heatmap.cost(i)
                         };
-                        let cost = (cost.log2() * 8. + 64.).round().max(0.).min(127.) as u8;
+                        let cost = (cost.log2() * 8. + 64.).round().clamp(0., 127.) as u8;
                         heatmap_bin.push((cost << 1) | heatmap.is_literal(i) as u8);
                     }
                     outfile(OutFileType::Heatmap).write(&heatmap_bin)?;
@@ -272,7 +272,9 @@ fn print_help(exit_code: i32) -> ! {
     eprintln!("Version: {}", env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("Config presets for specific unpackers:");
-    eprintln!(" --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9");
+    eprintln!(
+        " --z80               --big-endian-bitstream --invert-bit-encoding --simplified-prob-update -9"
+    );
     eprintln!(
         " --x86               --bitstream --invert-is-match-bit --invert-continue-value-bit --invert-new-offset-bit"
     );

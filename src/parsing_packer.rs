@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use crate::match_finder::MatchFinder;
 use crate::rans::{CostCounter, RansCoder};
-use crate::{lz, ProgressCallback};
+use crate::{ProgressCallback, lz};
 
 pub fn pack(
     data: &[u8],
@@ -68,7 +68,7 @@ fn parse(
         });
         let mut seen_offsets = HashSet::new();
         let mut remaining = Vec::new();
-        for arr in mem::replace(vec, Vec::new()) {
+        for arr in mem::take(vec) {
             if seen_offsets.insert(arr.state.last_offset()) {
                 if vec.len() < max_arrivals {
                     vec.push(arr);

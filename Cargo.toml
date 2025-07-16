@@ -1,7 +1,7 @@
 [package]
 name = "upkr"
-version = "0.2.2"
-edition = "2021"
+version = "0.2.3"
+edition = "2024"
 
 [profile.release]
 strip = "debuginfo"
@@ -11,8 +11,8 @@ terminal = ["crossterm", "pbr"]
 
 [dependencies]
 cdivsufsort = "2"
-lexopt = "0.2.1"
+lexopt = "0.3.1"
 anyhow = "1"
-thiserror = "1.0.36"
+thiserror = "2.0.12"
 pbr = { version = "1", optional = true }
-crossterm = { version = "0.25.0", default-features = false, optional = true }
+crossterm = { version = "0.29.0", default-features = false, optional = true }

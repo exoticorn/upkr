@@ -1,7 +1,7 @@
+use crate::Config;
 use crate::context_state::ContextState;
 use crate::heatmap::Heatmap;
 use crate::rans::{EntropyCoder, RansDecoder};
-use crate::Config;
 use thiserror::Error;
 
 #[derive(Copy, Clone, Debug)]
@@ -13,8 +13,8 @@ pub enum Op {
 impl Op {
     pub fn encode(&self, coder: &mut dyn EntropyCoder, state: &mut CoderState, config: &Config) {
         let literal_base = state.pos % state.parity_contexts * 256;
-        match self {
-            &Op::Literal(lit) => {
+        match *self {
+            Op::Literal(lit) => {
                 encode_bit(coder, state, literal_base, !config.is_match_bit);
                 let mut context_index = 1;
                 for i in (0..8).rev() {
@@ -25,7 +25,7 @@ impl Op {
                 state.prev_was_match = false;
                 state.pos += 1;
             }
-            &Op::Match { offset, len } => {
+            Op::Match { offset, len } => {
                 encode_bit(coder, state, literal_base, config.is_match_bit);
                 let mut new_offset = true;
                 if !state.prev_was_match && !config.no_repeated_offsets {
@@ -217,8 +217,8 @@ fn unpack_internal(
     config: &Config,
     max_size: usize,
 ) -> Result<isize, UnpackError> {
-    let mut decoder = RansDecoder::new(packed_data, &config)?;
-    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, &config);
+    let mut decoder = RansDecoder::new(packed_data, config)?;
+    let mut contexts = ContextState::new((1 + 255) * config.parity_contexts + 1 + 64 + 64, config);
     let mut offset = usize::MAX;
     let mut position = 0usize;
     let mut prev_was_match = false;
@@ -264,7 +264,7 @@ fn unpack_internal(
                     &mut decoder,
                     &mut contexts,
                     256 * config.parity_contexts + 1,
-                    &config,
+                    config,
                 )? - if config.eof_in_length { 0 } else { 1 };
                 if offset == 0 {
                     break;
@@ -274,7 +274,7 @@ fn unpack_internal(
                 &mut decoder,
                 &mut contexts,
                 256 * config.parity_contexts + 65,
-                &config,
+                config,
             )?;
             if config.eof_in_length && length == 1 {
                 break;
