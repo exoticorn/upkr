@@ -2,6 +2,9 @@
 name = "upkr"
 version = "0.2.3"
 edition = "2024"
+description = "Simple LZ packer with relatively small unpackers"
+license = "Unlicense"
+reepository = "https://github.com/exoticorn/upkr"
 
 [profile.release]
 strip = "debuginfo"
